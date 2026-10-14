@@ -14,6 +14,12 @@ h1{font-size:20px;margin:0 0 4px}.m{color:var(--m);font-size:14px}.r{display:fle
 .big.ra{background:var(--d)}.big:disabled{opacity:.45}#kq{white-space:pre-line;font-size:17px}
 #xem{width:100%;border-radius:12px;display:none;margin-top:10px}.spin{display:inline-block;width:16px;height:16px;border:3px solid #fff8;border-top-color:#fff;border-radius:50%;animation:s 1s linear infinite;vertical-align:-3px}
 @keyframes s{to{transform:rotate(360deg)}}
+#camK{position:fixed;inset:0;background:#000;display:none;flex-direction:column;align-items:center;justify-content:center;z-index:9}
+#vid{width:100%;max-width:480px;max-height:72vh;object-fit:cover;transform:scaleX(-1);border-radius:12px}
+#camG{color:#fff;font-size:15px;margin:12px 16px 0;text-align:center}
+.camN{display:flex;align-items:center;gap:28px;margin-top:18px}
+#chup{width:78px;height:78px;border-radius:50%;border:5px solid #fff;background:#ffffff33;font-size:30px;color:#fff}
+#huyCam{border:0;background:#ffffff26;color:#fff;border-radius:99px;padding:10px 18px;font-size:16px}
 </style></head><body><div class="w">
 <div class="k"><h1 id="ten">Chấm công</h1><div class="m" id="hom">Đang tải…</div>
 <div class="seg"><button id="bVao" class="on">🟢 Vào ca</button><button id="bRa">🔴 Ra ca</button></div></div>
@@ -22,6 +28,8 @@ h1{font-size:20px;margin:0 0 4px}.m{color:var(--m);font-size:14px}.r{display:fle
 <input type="file" id="cam" accept="image/*" capture="user" style="display:none">
 <img id="xem" alt=""><div class="m" style="margin-top:10px" id="ghi">Chụp ảnh mặt bằng camera trước. Ảnh chỉ dùng để đối chiếu chấm công.</div></div>
 <div class="k" id="kqK" style="display:none"><div id="kq"></div></div>
+<div id="camK"><video id="vid" playsinline autoplay muted></video><div id="camG">Nhìn thẳng vào camera rồi bấm nút chụp</div>
+<div class="camN"><button id="huyCam">Hủy</button><button id="chup">📸</button></div></div>
 </div><script>
 const GAS=''==='1', EXEC='https://script.google.com/macros/s/AKfycbzBTUAQ1A3MIz8BlhbKHYIsQbPKV9rxjbHgOGoLSZwiaQa8KjIu756s_oZzVWt-pGc/exec';
 let initData='',pos=null,tt=null,loai='VÀO',dangGui=false;
@@ -82,7 +90,25 @@ function dongTrang(){
   try{window.external&&window.external.notify&&window.external.notify(JSON.stringify({eventType:'web_app_close',eventData:{}}));}catch(e){}
   try{window.top.postMessage(JSON.stringify({eventType:'web_app_close',eventData:{}}),'*');}catch(e){}
 }
-$('nut').onclick=()=>{if(!pos)return;if(canAnh())$('cam').click();else gui('',0);};
+let luong=null;
+function tatCam(){if(luong){luong.getTracks().forEach(t=>t.stop());luong=null;}$('camK').style.display='none';}
+function moCam(){
+  if(!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia))return $('cam').click();
+  navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:720},height:{ideal:720}},audio:false}).then(s=>{
+    luong=s;const v=$('vid');v.srcObject=s;$('camK').style.display='flex';const p=v.play();if(p&&p.catch)p.catch(()=>{});
+  }).catch(e=>{
+    $('kqK').style.display='block';
+    $('kq').innerHTML='<span class="no">❌ Không mở được camera ('+(e.name||e)+').</span> Vào Cài đặt điện thoại → Ứng dụng → Telegram → Quyền → cho phép <b>Máy ảnh</b>, rồi mở lại trang. '+
+      '<a href="#" id="cachKhac">Hoặc chụp bằng ứng dụng máy ảnh</a>';
+    $('cachKhac').onclick=ev=>{ev.preventDefault();$('cam').click();};
+  });
+}
+$('huyCam').onclick=tatCam;
+$('chup').onclick=()=>{const v=$('vid');if(!v.videoWidth)return;
+  const M=560,s=Math.min(1,M/Math.max(v.videoWidth,v.videoHeight)),c=document.createElement('canvas');
+  c.width=Math.round(v.videoWidth*s);c.height=Math.round(v.videoHeight*s);c.getContext('2d').drawImage(v,0,0,c.width,c.height);
+  tatCam();const d=c.toDataURL('image/jpeg',0.6);$('xem').src=d;$('xem').style.display='block';gui(d.split(',')[1],Date.now());};
+$('nut').onclick=()=>{if(!pos)return;if(canAnh())moCam();else gui('',0);};
 $('cam').onchange=e=>{const f=e.target.files[0];if(!f)return;const luc=f.lastModified||Date.now();
   thuNho(f,d=>{$('xem').src=d;$('xem').style.display='block';gui(d.split(',')[1],luc);});e.target.value='';};
 function hienHom(){
