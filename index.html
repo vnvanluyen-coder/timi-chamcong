@@ -28,6 +28,7 @@ h1{font-size:20px;margin:0 0 4px}.m{color:var(--m);font-size:14px}.r{display:fle
 <input type="file" id="cam" accept="image/*" capture="user" style="display:none">
 <img id="xem" alt=""><div class="m" style="margin-top:10px" id="ghi">Chụp ảnh mặt bằng camera trước. Ảnh chỉ dùng để đối chiếu chấm công.</div></div>
 <div class="k" id="kqK" style="display:none"><div id="kq"></div></div>
+<div class="m" style="text-align:center;font-size:12px" id="ban">Trang v3</div>
 <div id="camK"><video id="vid" playsinline autoplay muted></video><div id="camG">Nhìn thẳng vào camera rồi bấm nút chụp</div>
 <div class="camN"><button id="huyCam">Hủy</button><button id="chup">📸</button></div></div>
 </div><script>
@@ -93,15 +94,16 @@ function dongTrang(){
 let luong=null;
 function tatCam(){if(luong){luong.getTracks().forEach(t=>t.stop());luong=null;}$('camK').style.display='none';}
 function moCam(){
-  if(!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia))return $('cam').click();
+  if(!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia))return loiCam('máy/Telegram không cho trang dùng camera trực tiếp');
   navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:720},height:{ideal:720}},audio:false}).then(s=>{
     luong=s;const v=$('vid');v.srcObject=s;$('camK').style.display='flex';const p=v.play();if(p&&p.catch)p.catch(()=>{});
-  }).catch(e=>{
-    $('kqK').style.display='block';
-    $('kq').innerHTML='<span class="no">❌ Không mở được camera ('+(e.name||e)+').</span> Vào Cài đặt điện thoại → Ứng dụng → Telegram → Quyền → cho phép <b>Máy ảnh</b>, rồi mở lại trang. '+
-      '<a href="#" id="cachKhac">Hoặc chụp bằng ứng dụng máy ảnh</a>';
-    $('cachKhac').onclick=ev=>{ev.preventDefault();$('cam').click();};
-  });
+  }).catch(e=>loiCam((e.name||'')+' '+(e.message||e)));
+}
+function loiCam(t){
+  $('kqK').style.display='block';
+  $('kq').innerHTML='<span class="no">❌ Không mở được camera: '+String(t).replace(/</g,'&lt;')+'</span><br>Vào Cài đặt điện thoại → Ứng dụng → Telegram → Quyền → cho phép <b>Máy ảnh</b>, tắt hẳn Telegram rồi mở lại. '+
+    '<br><a href="#" id="cachKhac">Hoặc chụp bằng ứng dụng máy ảnh</a>';
+  $('cachKhac').onclick=ev=>{ev.preventDefault();$('cam').click();};
 }
 $('huyCam').onclick=tatCam;
 $('chup').onclick=()=>{const v=$('vid');if(!v.videoWidth)return;
@@ -120,4 +122,6 @@ layInit(d=>{initData=d;goi('trangThaiApp',d,r=>{
   if(!r.ok){$('hom').innerHTML='<span class="no">'+r.loi+'</span>';return;}
   tt=r;$('ten').textContent='👋 '+r.ten;hienHom();if(pos)viTri({coords:pos});});});
 batGps();capNhat();
+try{$('ban').textContent='Trang v3 · camera trực tiếp: '+((navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)?'có':'KHÔNG')+
+  ' · '+((window.Telegram&&Telegram.WebApp&&Telegram.WebApp.platform)||'?')+' '+((window.Telegram&&Telegram.WebApp&&Telegram.WebApp.version)||'');}catch(e){}
 </script></body></html>
