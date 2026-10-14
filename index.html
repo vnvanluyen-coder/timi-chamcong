@@ -1,0 +1,96 @@
+<!doctype html><html lang="vi"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{--n:#f4f6f8;--c:#fff;--t:#1d2733;--m:#6b7785;--x:#1e8e3e;--d:#c5221f;--v:#e37400;--b:#1a73e8}
+@media (prefers-color-scheme:dark){:root{--n:#12171d;--c:#1c232b;--t:#e8edf2;--m:#9aa7b4}}
+*{box-sizing:border-box}body{margin:0;font:16px/1.45 -apple-system,Segoe UI,Roboto,sans-serif;background:var(--n);color:var(--t)}
+.w{max-width:480px;margin:0 auto;padding:16px}.k{background:var(--c);border-radius:16px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px #0002}
+h1{font-size:20px;margin:0 0 4px}.m{color:var(--m);font-size:14px}.r{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.tag{font-size:13px;padding:3px 10px;border-radius:99px;background:#0001}.ok{color:var(--x)}.no{color:var(--d)}.wa{color:var(--v)}
+.seg{display:flex;background:#0001;border-radius:12px;padding:4px;gap:4px;margin-top:12px}.seg button{flex:1;border:0;padding:10px;border-radius:9px;font-size:16px;background:transparent;color:var(--t)}
+.seg button.on{background:var(--c);box-shadow:0 1px 3px #0003;font-weight:600}
+.big{width:100%;border:0;border-radius:14px;padding:18px;font-size:19px;font-weight:700;color:#fff;background:var(--x);margin-top:4px}
+.big.ra{background:var(--d)}.big:disabled{opacity:.45}#kq{white-space:pre-line;font-size:17px}
+#xem{width:100%;border-radius:12px;display:none;margin-top:10px}.spin{display:inline-block;width:16px;height:16px;border:3px solid #fff8;border-top-color:#fff;border-radius:50%;animation:s 1s linear infinite;vertical-align:-3px}
+@keyframes s{to{transform:rotate(360deg)}}
+</style></head><body><div class="w">
+<div class="k"><h1 id="ten">Chấm công</h1><div class="m" id="hom">Đang tải…</div>
+<div class="seg"><button id="bVao" class="on">🟢 Vào ca</button><button id="bRa">🔴 Ra ca</button></div></div>
+<div class="k"><div class="r"><b>📍 Vị trí</b><span class="tag" id="gpsTag">đang lấy GPS…</span></div><div class="m" id="gps">Cho phép truy cập vị trí khi điện thoại hỏi.</div></div>
+<div class="k"><button class="big" id="nut" disabled>Đang chờ GPS…</button>
+<input type="file" id="cam" accept="image/*" capture="user" style="display:none">
+<img id="xem" alt=""><div class="m" style="margin-top:10px" id="ghi">Chụp ảnh mặt bằng camera trước. Ảnh chỉ dùng để đối chiếu chấm công.</div></div>
+<div class="k" id="kqK" style="display:none"><div id="kq"></div></div>
+</div><script>
+const GAS=''==='1', EXEC='https://script.google.com/macros/s/AKfycbzBTUAQ1A3MIz8BlhbKHYIsQbPKV9rxjbHgOGoLSZwiaQa8KjIu756s_oZzVWt-pGc/exec';
+let initData='',pos=null,tt=null,loai='VÀO',dangGui=false;
+const $=i=>document.getElementById(i);
+try{Telegram.WebApp.ready();Telegram.WebApp.expand();}catch(e){}
+function loi(t){$('kqK').style.display='block';$('kq').innerHTML='<span class="no">❌ '+t+'</span>';}
+function goi(ham,data,ok){
+  if(GAS){google.script.run.withSuccessHandler(ok).withFailureHandler(e=>{dangGui=false;capNhat();loi(e.message||e)})[ham](data);return;}
+  fetch(EXEC+'?app='+(ham==='trangThaiApp'?'tt':'cc'),{method:'POST',headers:{'Content-Type':'text/plain'},
+    body:JSON.stringify(ham==='trangThaiApp'?{initData:data}:data)}).then(r=>r.json()).then(ok).catch(e=>{dangGui=false;capNhat();loi(e)});
+}
+function tach(h){h=String(h||'').replace(/^#/,'');const i=h.indexOf('tgWebAppData=');if(i<0)return'';let v=h.slice(i+13);
+  const j=v.search(/&tgWebApp[A-Za-z]+=/);if(j>=0)v=v.slice(0,j);if(v.indexOf('=')<0){try{v=decodeURIComponent(v);}catch(e){}}return v;}
+function layInit(cb){
+  try{if(window.Telegram&&Telegram.WebApp&&Telegram.WebApp.initData)return cb(Telegram.WebApp.initData);}catch(e){}
+  if(GAS)google.script.url.getLocation(l=>cb(tach(l.hash)));
+  else cb(tach(location.hash));
+}
+function kc(a,b,c,d){const R=6371000,r=Math.PI/180,x=Math.sin((c-a)*r/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin((d-b)*r/2)**2;return 2*R*Math.asin(Math.sqrt(x));}
+function chonLoai(l){loai=l;$('bVao').classList.toggle('on',l==='VÀO');$('bRa').classList.toggle('on',l==='RA');capNhat();}
+$('bVao').onclick=()=>chonLoai('VÀO');$('bRa').onclick=()=>chonLoai('RA');
+function canAnh(){return tt&&(loai==='VÀO'?tt.anhVao:tt.anhRa);}
+function capNhat(){
+  const n=$('nut');n.className='big'+(loai==='RA'?' ra':'');
+  if(dangGui){n.disabled=true;n.innerHTML='<span class="spin"></span> Đang gửi…';return;}
+  if(!tt){n.disabled=true;n.textContent='Đang tải…';return;}
+  if(!pos){n.disabled=true;n.textContent='Đang chờ GPS…';return;}
+  n.disabled=false;n.textContent=(canAnh()?'📸 Chụp ảnh & chấm ':'✅ Chấm ')+(loai==='VÀO'?'VÀO CA':'RA CA');
+  $('ghi').textContent=canAnh()?'Chụp ảnh mặt bằng camera trước. Ảnh chỉ dùng để đối chiếu chấm công.':'Ra ca không cần chụp ảnh – bấm nút là xong.';
+}
+function viTri(p){
+  pos=p.coords;const acc=Math.round(pos.accuracy);let t='Sai số GPS ±'+acc+' m',tag='GPS ±'+acc+' m',cls='';
+  if(tt&&tt.diaDiem&&tt.diaDiem.length){let g=null;tt.diaDiem.forEach(d=>{const c=kc(pos.latitude,pos.longitude,d.lat,d.lng);if(!g||c<g.c)g={c,d};});
+    const ok=g.c<=g.d.bk;tag=(ok?'✅ ':'❌ ')+Math.round(g.c)+' m';cls=ok?'ok':'no';t='Cách '+g.d.ten+' '+Math.round(g.c)+' m (cho phép '+g.d.bk+' m) · '+t;}
+  if(tt&&tt.saiSo&&acc>tt.saiSo){cls='wa';t+=' – sai số lớn, ra chỗ thoáng hoặc bật "Vị trí chính xác"';}
+  $('gpsTag').textContent=tag;$('gpsTag').className='tag '+cls;$('gps').textContent=t;capNhat();
+}
+function loiGps(e){$('gpsTag').textContent='❌ không lấy được';$('gps').innerHTML='<span class="no">Không lấy được vị trí: '+(e.message||e.code)+
+  '.</span> Vào Cài đặt điện thoại → cho Telegram dùng Vị trí (Chính xác), rồi mở lại trang. Nếu vẫn lỗi: dùng nút 🟢 Vào ca trên bàn phím bot.';}
+function batGps(){if(!navigator.geolocation)return loiGps({message:'máy không hỗ trợ'});
+  navigator.geolocation.watchPosition(viTri,loiGps,{enableHighAccuracy:true,maximumAge:0,timeout:30000});}
+function thuNho(file,cb){const img=new Image(),u=URL.createObjectURL(file);img.onload=()=>{const M=560,s=Math.min(1,M/Math.max(img.width,img.height));
+  const c=document.createElement('canvas');c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+  URL.revokeObjectURL(u);cb(c.toDataURL('image/jpeg',0.6));};img.onerror=()=>{loi('Không đọc được ảnh');};img.src=u;}
+function gui(anh,anhLuc){
+  dangGui=true;capNhat();
+  goi('chamCongApp',{initData,loai,lat:pos.latitude,lng:pos.longitude,acc:pos.accuracy,anh:anh||'',anhLuc:anhLuc||0},r=>{
+    dangGui=false;$('kqK').style.display='block';$('kq').innerHTML='<span class="'+(r.ok?'ok':'no')+'">'+(r.text||'').replace(/</g,'&lt;')+'</span>';
+    try{Telegram.WebApp.HapticFeedback.notificationOccurred(r.ok?'success':'error');}catch(e){}
+    if(r.ok){$('nut').disabled=true;$('nut').textContent='✅ Xong – trang tự đóng…';
+      const g=(r.text||'').match(/(\d{2}:\d{2})/);if(loai==='VÀO'){tt.vao=g?g[1]:'✓';}else{tt.ra=g?g[1]:'✓';}
+      setTimeout(dongTrang,1200);setTimeout(()=>{$('nut').textContent='✅ Đã chấm – bấm Close để đóng';},3500);}
+    else capNhat();});
+}
+function dongTrang(){
+  try{Telegram.WebApp.close();}catch(e){}
+  try{window.TelegramWebviewProxy&&TelegramWebviewProxy.postEvent('web_app_close','{}');}catch(e){}
+  try{window.external&&window.external.notify&&window.external.notify(JSON.stringify({eventType:'web_app_close',eventData:{}}));}catch(e){}
+  try{window.top.postMessage(JSON.stringify({eventType:'web_app_close',eventData:{}}),'*');}catch(e){}
+}
+$('nut').onclick=()=>{if(!pos)return;if(canAnh())$('cam').click();else gui('',0);};
+$('cam').onchange=e=>{const f=e.target.files[0];if(!f)return;const luc=f.lastModified||Date.now();
+  thuNho(f,d=>{$('xem').src=d;$('xem').style.display='block';gui(d.split(',')[1],luc);});e.target.value='';};
+function hienHom(){
+  $('hom').textContent=tt.vao?('Hôm nay: vào '+tt.vao+(tt.ra?' · ra '+tt.ra+' (chấm lại Ra nếu về muộn hơn)':' · chưa ra')):'Hôm nay: chưa chấm';
+  if(tt.vao){$('bVao').style.display='none';$('bRa').style.flex='1';chonLoai('RA');}else chonLoai(tt.goiY);
+}
+layInit(d=>{initData=d;goi('trangThaiApp',d,r=>{
+  if(!r.ok){$('hom').innerHTML='<span class="no">'+r.loi+'</span>';return;}
+  tt=r;$('ten').textContent='👋 '+r.ten;hienHom();if(pos)viTri({coords:pos});});});
+batGps();capNhat();
+</script></body></html>
