@@ -87,7 +87,8 @@ $('cam').onchange=e=>{const f=e.target.files[0];if(!f)return;const luc=f.lastMod
   thuNho(f,d=>{$('xem').src=d;$('xem').style.display='block';gui(d.split(',')[1],luc);});e.target.value='';};
 function hienHom(){
   $('hom').textContent=tt.vao?('Hôm nay: vào '+tt.vao+(tt.ra?' · ra '+tt.ra+' (chấm lại Ra nếu về muộn hơn)':' · chưa ra')):'Hôm nay: chưa chấm';
-  if(tt.vao){$('bVao').style.display='none';$('bRa').style.flex='1';chonLoai('RA');}else chonLoai(tt.goiY);
+  const L=new URLSearchParams(location.search).get('l');
+  if(tt.vao){$('bVao').style.display='none';$('bRa').style.flex='1';chonLoai('RA');}else chonLoai(L==='RA'?'RA':L==='VAO'?'VÀO':tt.goiY);
 }
 layInit(d=>{initData=d;goi('trangThaiApp',d,r=>{
   if(!r.ok){$('hom').innerHTML='<span class="no">'+r.loi+'</span>';return;}
