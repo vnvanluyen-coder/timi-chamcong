@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Quét đơn TimiShop</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{--n:#0e1318;--c:#182029;--c2:#212b36;--t:#eef2f6;--m:#93a1b0;--x:#2fbf71;--v:#f0a43a;--d:#ef5350;--b:#4a9cf5;--ln:#2b3642}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--n);color:var(--t);font:15px/1.4 -apple-system,"Segoe UI",Roboto,sans-serif}
+.w{max-width:560px;margin:0 auto;padding:10px 12px 90px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
+.top b{font-size:16px}.m{color:var(--m);font-size:13px}
+.seg{display:flex;gap:6px;margin-bottom:10px}
+.seg button{flex:1;border:1px solid var(--ln);background:var(--c);color:var(--t);border-radius:12px;padding:10px 6px;font-size:15px;font-weight:600}
+.seg button.on.DI{background:#1f5f3f;border-color:var(--x)}.seg button.on.HOAN{background:#5c3f14;border-color:var(--v)}
+.seg button:disabled{opacity:.35}
+.seg .so{display:inline-block;min-width:24px;margin-left:4px;padding:0 6px;border-radius:99px;background:#ffffff26;font-size:13px}
+.cam{position:relative;border-radius:14px;overflow:hidden;background:#000;aspect-ratio:4/3;max-height:44vh;width:100%}
+.cam video{width:100%;height:100%;object-fit:cover;display:block}
+.khung{position:absolute;left:8%;right:8%;top:16%;bottom:16%;border:3px solid #ffffffb3;border-radius:10px;box-shadow:0 0 0 999px #00000059}
+.tia{position:absolute;left:10%;right:10%;top:50%;height:2px;background:var(--d);opacity:.8}
+.bao{position:absolute;left:8px;right:8px;bottom:8px;padding:8px 10px;border-radius:10px;font-weight:700;text-align:center;display:none}
+.bao.ok{background:#1e8e3ee6}.bao.trung{background:#c77700e6}.bao.loi{background:#c5221fe6}
+.batdau{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:16px}
+.batdau button{background:var(--b);color:#fff;border:0;border-radius:14px;padding:16px 22px;font-size:17px;font-weight:700}
+.cong{display:flex;gap:6px;margin:8px 0}
+.cong button{flex:1;border:1px solid var(--ln);background:var(--c);color:var(--t);border-radius:10px;padding:9px 4px;font-size:14px}
+.cong button.bat{background:#3d4a14;border-color:#c0d84a}
+.tay{display:none;gap:6px;margin-bottom:8px}.tay input{flex:1;min-width:0;background:var(--c);color:var(--t);border:1px solid var(--ln);border-radius:10px;padding:10px;font-size:16px;text-transform:uppercase}
+.tay button{background:var(--b);color:#fff;border:0;border-radius:10px;padding:0 14px;font-weight:700}
+.ds{display:grid;gap:8px;margin-top:6px}
+.it{background:var(--c);border:1px solid var(--ln);border-radius:12px;padding:10px;display:grid;gap:6px}
+.it .r{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.it .ma{font:600 15px ui-monospace,Menlo,Consolas,monospace;word-break:break-all}
+.chip{font-size:12px;font-weight:700;padding:3px 8px;border-radius:99px;white-space:nowrap}
+.chip.moi{background:#2fbf7133;color:var(--x)}.chip.trung{background:#f0a43a33;color:var(--v)}.chip.loi{background:#ef535033;color:var(--d)}.chip.cho{background:#ffffff1f;color:var(--m)}
+.it .act{display:flex;flex-wrap:wrap;gap:6px}
+.it .act button{border:1px solid var(--ln);background:var(--c2);color:var(--t);border-radius:8px;padding:6px 10px;font-size:13px}
+.it .act button.on{background:#5c3f14;border-color:var(--v)}
+.it .act button.xoa{color:var(--d)}
+.it img{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--ln)}
+.anhs{display:flex;gap:6px;flex-wrap:wrap}
+.loi{color:var(--d)}
+.chan{position:fixed;left:0;right:0;bottom:0;background:var(--c);border-top:1px solid var(--ln);padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px));font-size:14px;display:flex;justify-content:space-between;gap:8px}
+#ban{font-size:11px;color:var(--m);text-align:center;margin-top:12px}
+</style></head><body>
+<div class="w">
+  <div class="top"><div><b id="ten">Quét đơn</b><div class="m" id="tt">Đang tải…</div></div><div class="m" id="gio"></div></div>
+  <div class="seg"><button id="sDI" class="DI on" data-l="DI">📤 Đơn đi<span class="so" id="nDI">0</span></button>
+    <button id="sHOAN" class="HOAN" data-l="HOAN">📥 Đơn hoàn<span class="so" id="nHOAN">0</span></button></div>
+  <div class="cam"><video id="vid" playsinline autoplay muted></video><div class="khung"></div><div class="tia"></div>
+    <div class="bao" id="bao"></div>
+    <div class="batdau" id="batdau"><div><button id="nutBd">📷 Bắt đầu quét</button><div class="m" style="margin-top:10px">Camera bật liên tục. Đưa mã vạch hoặc mã QR vào khung, máy kêu "bíp" là xong, quét tiếp mã sau.</div></div></div>
+  </div>
+  <div class="cong"><button id="nDen">🔦 Đèn</button><button id="nTay">⌨️ Nhập tay</button><button id="nDung">⏸ Tạm dừng</button></div>
+  <div class="tay" id="tay"><input id="oTay" placeholder="Gõ mã vận đơn" autocomplete="off"><button id="guiTay">Ghi</button></div>
+  <div class="ds" id="ds"></div>
+  <div id="ban">Trang quét v1</div>
+</div>
+<div class="chan"><span id="tong">Phiên này: 0 mới · 0 trùng</span><span id="cho"></span></div>
+<script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
+<script>
+const EXEC='https://script.google.com/macros/s/AKfycbzBTUAQ1A3MIz8BlhbKHYIsQbPKV9rxjbHgOGoLSZwiaQa8KjIu756s_oZzVWt-pGc/exec';
+const $=i=>document.getElementById(i);
+let initData='',tt=null,loai='DI',luong=null,det=null,zx=null,dang=false,dungTam=false,den=false,dem={DI:0,HOAN:0};
+const daThay=new Map(),ds=[],TINH=['Nguyên vẹn','Móp/bẹp','Rách','Thiếu hàng','Ướt'];
+try{Telegram.WebApp.ready();Telegram.WebApp.expand();}catch(e){}
+function tach(h){h=String(h||'').replace(/^#/,'');const i=h.indexOf('tgWebAppData=');if(i<0)return'';let v=h.slice(i+13);
+  const j=v.search(/&tgWebApp[A-Za-z]+=/);if(j>=0)v=v.slice(0,j);if(v.indexOf('=')<0){try{v=decodeURIComponent(v);}catch(e){}}return v;}
+try{initData=(window.Telegram&&Telegram.WebApp&&Telegram.WebApp.initData)||tach(location.hash);}catch(e){initData=tach(location.hash);}
+function goi(app,body){return fetch(EXEC+'?app='+app,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(Object.assign({initData},body))}).then(r=>r.json());}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+// ---------- âm thanh, rung
+let ac=null;
+function bip(ok){try{if(!ac)ac=new (window.AudioContext||window.webkitAudioContext)();const t=ac.currentTime;
+  [0,ok?null:0.16].forEach(d=>{if(d===null)return;const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=ok?1400:300;o.type=ok?'sine':'square';
+    g.gain.setValueAtTime(0.25,t+d);g.gain.exponentialRampToValueAtTime(0.001,t+d+0.13);o.connect(g);g.connect(ac.destination);o.start(t+d);o.stop(t+d+0.14);});}catch(e){}
+  try{Telegram.WebApp.HapticFeedback.notificationOccurred(ok?'success':'warning');}catch(e){try{navigator.vibrate&&navigator.vibrate(ok?60:[60,60,60]);}catch(e2){}}}
+let tb=null;
+function bao(cls,t){const b=$('bao');b.className='bao '+cls;b.textContent=t;b.style.display='block';clearTimeout(tb);tb=setTimeout(()=>b.style.display='none',1800);}
+// ---------- chế độ
+function chonLoai(l){if(!tt||tt.quyen.indexOf(l)<0)return;loai=l;['DI','HOAN'].forEach(k=>$('s'+k).classList.toggle('on',k===l));ve();}
+$('sDI').onclick=()=>chonLoai('DI');$('sHOAN').onclick=()=>chonLoai('HOAN');
+function capSo(){['DI','HOAN'].forEach(k=>$('n'+k).textContent=dem[k]||0);
+  const moi=ds.filter(x=>x.tt==='moi').length,tr=ds.filter(x=>x.tt==='trung').length,cho=ds.filter(x=>x.tt==='cho'||x.tt==='loi').length;
+  $('tong').textContent='Phiên này: '+moi+' mới · '+tr+' trùng';$('cho').textContent=cho?('⏳ '+cho+' đang gửi'):'';
+  try{cho?Telegram.WebApp.enableClosingConfirmation():Telegram.WebApp.disableClosingConfirmation();}catch(e){}}
+// ---------- danh sách
+function ve(){const el=$('ds');el.innerHTML='';ds.filter(x=>x.loai===loai).forEach(x=>{const d=document.createElement('div');d.className='it';
+  const chip={moi:'<span class="chip moi">✅ Mới'+(x.stt?' #'+x.stt:'')+'</span>',trung:'<span class="chip trung">🟠 Đã có – '+esc(x.luc)+(x.ai?' · '+esc(x.ai):'')+'</span>',
+    cho:'<span class="chip cho">⏳ Đang gửi</span>',loi:'<span class="chip loi">❌ Lỗi</span>',xoa:'<span class="chip cho">🗑 Đã xóa</span>'}[x.tt];
+  let h='<div class="r"><span class="ma">'+esc(x.ma)+'</span>'+chip+'</div><div class="m">'+esc(x.gio)+(x.donDi?' · khớp đơn đi '+esc(x.donDi.ngay)+(x.donDi.tt?' ('+esc(x.donDi.tt)+')':''):'')+
+    (x.loai==='HOAN'&&x.tt==='moi'&&!x.donDi?' · <span class="loi">không thấy trong đơn đi</span>':'')+(x.loi?' · <span class="loi">'+esc(x.loi)+'</span>':'')+'</div>';
+  if(x.tt==='moi'||x.tt==='trung'){h+='<div class="act">';
+    if(x.loai==='HOAN')TINH.forEach(t=>h+='<button data-a="tinh" data-v="'+t+'" class="'+(x.tinh===t?'on':'')+'">'+t+'</button>');
+    h+='<button data-a="anh">📷 Chụp gói hàng</button>'+(x.tt==='moi'?'<button data-a="xoa" class="xoa">🗑 Xóa</button>':'')+'</div>';}
+  if(x.tt==='loi')h+='<div class="act"><button data-a="lai">↻ Gửi lại</button></div>';
+  if(x.anhs.length)h+='<div class="anhs">'+x.anhs.map(a=>'<img src="'+a.src+'" alt="ảnh '+esc(x.ma)+'">'+(a.ok?'':'<span class="m">'+(a.loi?'❌':'⏳')+'</span>')).join('')+'</div>';
+  d.innerHTML=h;d.querySelectorAll('button').forEach(b=>b.onclick=()=>hanhDong(x,b.dataset.a,b.dataset.v));el.appendChild(d);});capSo();}
+function hanhDong(x,a,v){
+  if(a==='lai'){gui(x);return;}
+  if(a==='tinh'){x.tinh=v;ve();goi('qc',{loai:x.loai,ma:x.ma,tinhTrang:v}).then(r=>{if(!r.ok){x.loi=r.text;ve();}}).catch(()=>{x.loi='Mất mạng – chọn lại';ve();});return;}
+  if(a==='anh'){const s=chup();if(!s){bao('loi','Bật camera trước');return;}const o={src:s,ok:false};x.anhs.push(o);ve();
+    goi('qc',{loai:x.loai,ma:x.ma,anh:s.split(',')[1]}).then(r=>{o.ok=r.ok;o.loi=!r.ok;if(!r.ok)x.loi=r.text;ve();}).catch(()=>{o.loi=true;x.loi='Mất mạng – ảnh chưa lưu';ve();});return;}
+  if(a==='xoa'){if(x.hoiXoa!==1){x.hoiXoa=1;bao('trung','Bấm 🗑 Xóa lần nữa để xóa '+x.ma);setTimeout(()=>x.hoiXoa=0,4000);return;}
+    goi('qx',{loai:x.loai,ma:x.ma}).then(r=>{if(r.ok){x.tt='xoa';dem[x.loai]=r.dem;daThay.delete(x.loai+x.ma);}else x.loi=r.text;ve();}).catch(()=>{x.loi='Mất mạng';ve();});}
+}
+// ---------- gửi mã
+function gioNay(){return new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});}
+function chuan(s){s=String(s||'').trim();const m=s.toUpperCase().match(/SPXVN[0-9A-Z]{8,14}/);return m?m[0]:s.replace(/\s+/g,'').toUpperCase().slice(0,60);}
+function nhan(raw){const ma=chuan(raw);if(ma.length<6)return;const k=loai+ma,now=Date.now();
+  if(daThay.has(k)){if(now-daThay.get(k)>2500){daThay.set(k,now);bao('trung','Đã quét trong phiên: '+ma);bip(false);}return;}
+  daThay.set(k,now);const x={ma,loai,tt:'cho',gio:gioNay(),anhs:[]};ds.unshift(x);bip(true);bao('ok','✓ '+ma);ve();gui(x);}
+function gui(x,lan){x.tt='cho';x.loi='';ve();lan=lan||0;
+  goi('qd',{loai:x.loai,ma:x.ma}).then(r=>{
+    if(!r.ok){x.tt='loi';x.loi=r.text;bip(false);ve();return;}
+    x.tt=r.trung?'trung':'moi';x.stt=r.stt;x.luc=r.luc;x.ai=r.ai;x.donDi=r.donDi;if(r.dem!=null)dem[x.loai]=r.dem;
+    if(r.trung){bip(false);bao('trung','Mã này đã có: '+x.ma);}ve();
+  }).catch(()=>{x.tt='loi';x.loi='Mất mạng – tự gửi lại';ve();if(lan<20)setTimeout(()=>gui(x,lan+1),4000);});}
+// ---------- camera & đọc mã
+function chup(){const v=$('vid');if(!luong||!v.videoWidth)return null;const M=1280,s=Math.min(1,M/Math.max(v.videoWidth,v.videoHeight));
+  const c=document.createElement('canvas');c.width=Math.round(v.videoWidth*s);c.height=Math.round(v.videoHeight*s);c.getContext('2d').drawImage(v,0,0,c.width,c.height);
+  return c.toDataURL('image/jpeg',0.7);}
+async function batCam(){
+  if(!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)){$('batdau').innerHTML='<div class="loi">❌ Telegram trên máy này không cho trang dùng camera. Cập nhật Telegram, hoặc báo quản lý.</div>';return;}
+  try{luong=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},audio:false});}
+  catch(e){$('batdau').innerHTML='<div class="loi">❌ Không mở được camera: '+esc(e.name||e)+'<br>Cài đặt → Ứng dụng → Telegram → Quyền → cho phép Máy ảnh, rồi mở lại trang.</div>';return;}
+  const v=$('vid');v.srcObject=luong;try{await v.play();}catch(e){}
+  $('batdau').style.display='none';
+  try{if(ac)ac.resume();else ac=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}
+  try{if('BarcodeDetector' in window){const f=await BarcodeDetector.getSupportedFormats();const can=['code_128','qr_code','code_39','ean_13','data_matrix'].filter(x=>f.indexOf(x)>=0);
+    if(can.indexOf('code_128')>=0&&can.indexOf('qr_code')>=0)det=new BarcodeDetector({formats:can});}}catch(e){det=null;}
+  if(!det&&window.ZXing){const H=new Map();H.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[ZXing.BarcodeFormat.CODE_128,ZXing.BarcodeFormat.QR_CODE,ZXing.BarcodeFormat.CODE_39,ZXing.BarcodeFormat.EAN_13]);
+    H.set(ZXing.DecodeHintType.TRY_HARDER,true);zx=new ZXing.MultiFormatReader();zx.setHints(H);}
+  $('ban').textContent='Trang quét v1 · đọc mã: '+(det?'máy':'zxing')+' · '+((window.Telegram&&Telegram.WebApp.platform)||'?');
+  const tr=luong.getVideoTracks()[0];let cap={};try{cap=tr.getCapabilities?tr.getCapabilities():{};}catch(e){}if(!cap.torch)$('nDen').disabled=true;
+  dang=true;vong();}
+$('nutBd').onclick=batCam;
+const cv=document.createElement('canvas');
+async function doc(){const v=$('vid');if(!v.videoWidth)return null;
+  if(det){const r=await det.detect(v);return r.length?r[0].rawValue:null;}
+  if(!zx)return null;const W=v.videoWidth,Hh=v.videoHeight,cw=Math.min(960,W),ch=Math.round(Hh*cw/W);cv.width=cw;cv.height=ch;
+  cv.getContext('2d').drawImage(v,0,0,cw,ch);
+  try{const src=new ZXing.HTMLCanvasElementLuminanceSource(cv);const bm=new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(src));return zx.decodeWithState(bm).getText();}
+  catch(e){return null;}finally{try{zx.reset();}catch(e){}}}
+async function vong(){if(!dang)return;if(!dungTam){try{const t=await doc();if(t)nhan(t);}catch(e){}}setTimeout(vong,det?120:220);}
+$('nDung').onclick=()=>{dungTam=!dungTam;$('nDung').textContent=dungTam?'▶️ Quét tiếp':'⏸ Tạm dừng';$('nDung').classList.toggle('bat',dungTam);};
+$('nDen').onclick=async()=>{if(!luong)return;den=!den;try{await luong.getVideoTracks()[0].applyConstraints({advanced:[{torch:den}]});$('nDen').classList.toggle('bat',den);}catch(e){den=false;}};
+$('nTay').onclick=()=>{const t=$('tay');t.style.display=t.style.display==='flex'?'none':'flex';if(t.style.display==='flex')$('oTay').focus();};
+$('guiTay').onclick=()=>{const v=$('oTay').value;if(v.trim()){nhan(v);$('oTay').value='';}};
+$('oTay').onkeydown=e=>{if(e.key==='Enter')$('guiTay').click();};
+setInterval(()=>$('gio').textContent=new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'}),10000);
+// ---------- mở trang
+goi('qt',{}).then(r=>{if(!r.ok){$('tt').innerHTML='<span class="loi">'+esc(r.loi)+'</span>';$('nutBd').disabled=true;return;}
+  tt=r;$('ten').textContent='👋 '+r.ten;Object.assign(dem,r.dem||{});
+  ['DI','HOAN'].forEach(k=>$('s'+k).disabled=r.quyen.indexOf(k)<0);
+  const L=new URLSearchParams(location.search).get('l');chonLoai(L==='HOAN'&&r.quyen.indexOf('HOAN')>=0?'HOAN':r.quyen[0]);
+  $('tt').textContent='Hôm nay: '+(dem.DI||0)+' đơn đi · '+(dem.HOAN||0)+' đơn hoàn';
+}).catch(e=>{$('tt').innerHTML='<span class="loi">Không kết nối được máy chủ: '+esc(e)+'</span>';});
+</script></body></html>
