@@ -1,5 +1,6 @@
 <!doctype html><html lang="vi"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<link rel="preconnect" href="https://script.google.com"><link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
 :root{--n:#f4f6f8;--c:#fff;--t:#1d2733;--m:#6b7785;--x:#1e8e3e;--d:#c5221f;--v:#e37400;--b:#1a73e8}
@@ -28,7 +29,7 @@ h1{font-size:20px;margin:0 0 4px}.m{color:var(--m);font-size:14px}.r{display:fle
 <input type="file" id="cam" accept="image/*" capture="user" style="display:none">
 <img id="xem" alt=""><div class="m" style="margin-top:10px" id="ghi">Chụp ảnh mặt bằng camera trước. Ảnh chỉ dùng để đối chiếu chấm công.</div></div>
 <div class="k" id="kqK" style="display:none"><div id="kq"></div></div>
-<div class="m" style="text-align:center;font-size:12px" id="ban">Trang v3</div>
+<div class="m" style="text-align:center;font-size:12px" id="ban">Trang v4</div>
 <div id="camK"><video id="vid" playsinline autoplay muted></video><div id="camG">Nhìn thẳng vào camera rồi bấm nút chụp</div>
 <div class="camN"><button id="huyCam">Hủy</button><button id="chup">📸</button></div></div>
 </div><script>
@@ -50,7 +51,7 @@ function layInit(cb){
   else cb(tach(location.hash));
 }
 function kc(a,b,c,d){const R=6371000,r=Math.PI/180,x=Math.sin((c-a)*r/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin((d-b)*r/2)**2;return 2*R*Math.asin(Math.sqrt(x));}
-function chonLoai(l){loai=l;$('bVao').classList.toggle('on',l==='VÀO');$('bRa').classList.toggle('on',l==='RA');capNhat();}
+function chonLoai(l){loai=l;if(tt&&!canAnh())tatCamSan();$('bVao').classList.toggle('on',l==='VÀO');$('bRa').classList.toggle('on',l==='RA');capNhat();}
 $('bVao').onclick=()=>chonLoai('VÀO');$('bRa').onclick=()=>chonLoai('RA');
 function canAnh(){return tt&&(loai==='VÀO'?tt.anhVao:tt.anhRa);}
 function capNhat(){
@@ -71,7 +72,7 @@ function viTri(p){
 function loiGps(e){$('gpsTag').textContent='❌ không lấy được';$('gps').innerHTML='<span class="no">Không lấy được vị trí: '+(e.message||e.code)+
   '.</span> Vào Cài đặt điện thoại → cho Telegram dùng Vị trí (Chính xác), rồi mở lại trang. Nếu vẫn lỗi: dùng nút 🟢 Vào ca trên bàn phím bot.';}
 function batGps(){if(!navigator.geolocation)return loiGps({message:'máy không hỗ trợ'});
-  navigator.geolocation.watchPosition(viTri,loiGps,{enableHighAccuracy:true,maximumAge:0,timeout:30000});}
+  navigator.geolocation.watchPosition(viTri,loiGps,{enableHighAccuracy:true,maximumAge:10000,timeout:30000});}
 function thuNho(file,cb){const img=new Image(),u=URL.createObjectURL(file);img.onload=()=>{const M=560,s=Math.min(1,M/Math.max(img.width,img.height));
   const c=document.createElement('canvas');c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);c.getContext('2d').drawImage(img,0,0,c.width,c.height);
   URL.revokeObjectURL(u);cb(c.toDataURL('image/jpeg',0.6));};img.onerror=()=>{loi('Không đọc được ảnh');};img.src=u;}
@@ -91,13 +92,19 @@ function dongTrang(){
   try{window.external&&window.external.notify&&window.external.notify(JSON.stringify({eventType:'web_app_close',eventData:{}}));}catch(e){}
   try{window.top.postMessage(JSON.stringify({eventType:'web_app_close',eventData:{}}),'*');}catch(e){}
 }
-let luong=null;
-function tatCam(){if(luong){luong.getTracks().forEach(t=>t.stop());luong=null;}$('camK').style.display='none';}
+let luong=null,camSan=null;
+function tatCam(){if(luong){luong.getTracks().forEach(t=>t.stop());luong=null;}camSan=null;$('camK').style.display='none';}
+function layCam(){return navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:720},height:{ideal:720}},audio:false});}
+// mở sẵn camera ngầm ngay khi vào trang (song song với GPS và tải dữ liệu) để lúc bấm nút hiện ngay
+function camTruoc(){if(!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia))return;
+  camSan=layCam().then(s=>{if(camSan===null||luong){s.getTracks().forEach(t=>t.stop());return luong;}luong=s;$('vid').srcObject=s;return s;}).catch(()=>{camSan=null;return null;});}
+function tatCamSan(){if($('camK').style.display!=='flex')tatCam();}
+function hienCam(s){luong=s;const v=$('vid');if(v.srcObject!==s)v.srcObject=s;$('camK').style.display='flex';const p=v.play();if(p&&p.catch)p.catch(()=>{});}
 function moCam(){
   if(!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia))return loiCam('máy/Telegram không cho trang dùng camera trực tiếp');
-  navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:720},height:{ideal:720}},audio:false}).then(s=>{
-    luong=s;const v=$('vid');v.srcObject=s;$('camK').style.display='flex';const p=v.play();if(p&&p.catch)p.catch(()=>{});
-  }).catch(e=>loiCam((e.name||'')+' '+(e.message||e)));
+  if(luong&&luong.getVideoTracks().some(t=>t.readyState==='live'))return hienCam(luong);
+  (camSan||Promise.resolve(null)).then(s=>s&&s.getVideoTracks().some(t=>t.readyState==='live')?s:layCam())
+    .then(hienCam).catch(e=>loiCam((e.name||'')+' '+(e.message||e)));
 }
 function loiCam(t){
   $('kqK').style.display='block';
@@ -120,8 +127,9 @@ function hienHom(){
 }
 layInit(d=>{initData=d;goi('trangThaiApp',d,r=>{
   if(!r.ok){$('hom').innerHTML='<span class="no">'+r.loi+'</span>';return;}
-  tt=r;$('ten').textContent='👋 '+r.ten;hienHom();if(pos)viTri({coords:pos});});});
-batGps();capNhat();
-try{$('ban').textContent='Trang v3 · camera trực tiếp: '+((navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)?'có':'KHÔNG')+
+  tt=r;$('ten').textContent='👋 '+r.ten;hienHom();if(pos)viTri({coords:pos});
+  if(!tt.anhVao&&!tt.anhRa)tatCamSan();});});
+batGps();capNhat();if(!GAS)camTruoc();
+try{$('ban').textContent='Trang v4 · camera trực tiếp: '+((navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)?'có':'KHÔNG')+
   ' · '+((window.Telegram&&Telegram.WebApp&&Telegram.WebApp.platform)||'?')+' '+((window.Telegram&&Telegram.WebApp&&Telegram.WebApp.version)||'');}catch(e){}
 </script></body></html>

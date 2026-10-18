@@ -2,6 +2,7 @@
 <html lang="vi"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <title>Quét đơn TimiShop</title>
+<link rel="preconnect" href="https://script.google.com"><link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
 :root{--n:#0e1318;--c:#182029;--c2:#212b36;--t:#eef2f6;--m:#93a1b0;--x:#2fbf71;--v:#f0a43a;--d:#ef5350;--b:#4a9cf5;--p:#b06cf0;--ln:#2b3642}
@@ -61,23 +62,25 @@ html,body{margin:0;background:var(--n);color:var(--t);font:15px/1.4 -apple-syste
     <button id="sHOAN" class="HOAN">📥 Đơn hoàn<span class="so" id="nHOAN">0</span></button></div>
   <div class="cam"><video id="vid" playsinline autoplay muted></video><div class="khung"></div><div class="tia"></div>
     <div class="bao" id="bao"></div>
-    <div class="batdau" id="batdau"><div><button id="nutBd" disabled>Đang tải…</button><div class="m" style="margin-top:10px">Camera bật liên tục. Đưa mã vạch hoặc mã QR vào khung, máy kêu "bíp" là xong, quét tiếp mã sau.</div></div></div>
+    <div class="batdau" id="batdau"><div><button id="nutBd" disabled>Đang mở camera…</button><div class="m" style="margin-top:10px">Camera bật liên tục. Đưa mã vạch hoặc mã QR vào khung, máy kêu "bíp" là xong, quét tiếp mã sau.</div></div></div>
   </div>
   <div class="cong"><button id="nDen">🔦 Đèn</button><button id="nTay">⌨️ Nhập tay</button><button id="nDung">⏸ Tạm dừng</button></div>
   <div class="tay" id="tay"><input id="oTay" placeholder="Gõ mã vận đơn" autocomplete="off"><button id="guiTay">Ghi</button></div>
   <div class="tde"><b id="tdeDs">Đơn đi đã quét hôm nay</b><span class="m" id="cho"></span></div>
   <div class="ds" id="ds"></div>
-  <div id="ban">Trang quét v2</div>
+  <div id="ban">Trang quét v3</div>
 </div>
 <div class="pop" id="pop"><div class="hop"><div class="ic" id="pIc"></div><h2 id="pTd"></h2><div class="ma" id="pMa"></div><p id="pNd"></p>
   <button id="pOk">OK – quét tiếp</button></div></div>
-<script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
 <script>
 const EXEC='https://script.google.com/macros/s/AKfycbzBTUAQ1A3MIz8BlhbKHYIsQbPKV9rxjbHgOGoLSZwiaQa8KjIu756s_oZzVWt-pGc/exec';
 const $=i=>document.getElementById(i);
 let initData='',tt=null,loai='DI',luong=null,det=null,zx=null,dang=false,dungTam=false,den=false,popMo=false;
 const ds={DI:[],HOAN:[]},daCo={DI:new Set(),HOAN:new Set()},TINH=['Nguyên vẹn','Móp/bẹp','Rách','Thiếu hàng','Ướt'];
-let huy={};const ganDay=new Map();
+let huy={};const ganDay=new Map();const choTai=[];
+// máy không có bộ đọc mã sẵn (iPhone) mới tải thư viện zxing, tải ngầm ngay lúc mở trang
+function canZx(){return !('BarcodeDetector' in window);}
+if(canZx()){const sc=document.createElement('script');sc.src='https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js';sc.async=true;document.head.appendChild(sc);}
 try{Telegram.WebApp.ready();Telegram.WebApp.expand();}catch(e){}
 function tach(h){h=String(h||'').replace(/^#/,'');const i=h.indexOf('tgWebAppData=');if(i<0)return'';let v=h.slice(i+13);
   const j=v.search(/&tgWebApp[A-Za-z]+=/);if(j>=0)v=v.slice(0,j);if(v.indexOf('=')<0){try{v=decodeURIComponent(v);}catch(e){}}return v;}
@@ -104,7 +107,7 @@ const ND={FUN:'Đơn này chưa có mã vận đơn của SPX – shipper sẽ k
   HUY:r=>'Đơn '+(r.maDon||'')+' · '+(r.loaiHuy||r.loai||'Đã hủy')+(r.luc?' lúc '+r.luc:'')+(r.khach?'\nKhách: '+r.khach:'')+'\nRút gói này ra, KHÔNG giao cho shipper.',
   TRUNG:r=>r&&r.luc?('Đã quét lúc '+r.luc+(r.ai?' · '+r.ai:'')+(r.stt?' · STT '+r.stt:'')+(r.tt?'\nTrạng thái: '+r.tt:'')+'\nKiểm tra xem có bị in/đóng 2 lần không.'):'Mã này đã có trong danh sách. Đang lấy chi tiết…'};
 // ---------- chế độ, đếm
-function chonLoai(l){if(!tt||tt.quyen.indexOf(l)<0)return;loai=l;['DI','HOAN'].forEach(k=>$('s'+k).classList.toggle('on',k===l));ve();}
+function chonLoai(l){if(tt&&tt.quyen.indexOf(l)<0)return;loai=l;['DI','HOAN'].forEach(k=>$('s'+k).classList.toggle('on',k===l));ve();}
 $('sDI').onclick=()=>chonLoai('DI');$('sHOAN').onclick=()=>chonLoai('HOAN');
 function demHomNay(l){return ds[l].filter(x=>x.tt==='moi').length;}
 function capSo(){['DI','HOAN'].forEach(k=>$('n'+k).textContent=demHomNay(k));$('demLon').textContent=demHomNay(loai);
@@ -135,7 +138,9 @@ function hanhDong(x,a,v){
 // ---------- quét được mã
 function gioNay(){return new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'});}
 function chuan(s){s=String(s||'').trim().toUpperCase();const m=s.match(/SPXVN[0-9A-Z]{8,14}/)||s.match(/FUN\d{3,12}/);return m?m[0]:s.replace(/\s+/g,'').slice(0,60);}
-function nhan(raw){if(popMo)return;const ma=chuan(raw);if(ma.length<6)return;const l=loai,now=Date.now();
+function nhan(raw){if(popMo)return;const ma=chuan(raw);if(ma.length<6)return;
+  if(!tt){if(choTai.indexOf(loai+'|'+ma)<0){choTai.push(loai+'|'+ma);tieng('ok');bao('✓ '+ma+' · chờ tải xong sẽ ghi');}return;}
+  const l=loai,now=Date.now();
   if(ganDay.has(l+ma)&&now-ganDay.get(l+ma)<3000)return;ganDay.set(l+ma,now);
   if(l==='DI'&&/^FUN/.test(ma)){popup('FUN',ma,ND.FUN);return;}
   if(daCo[l].has(ma)){popup('TRUNG',ma,ND.TRUNG(null));goi('qd',{loai:l,ma}).then(r=>{if(r.chan==='TRUNG')capNhatPop(ma,ND.TRUNG(r));}).catch(()=>{});return;}
@@ -151,25 +156,30 @@ function gui(x,lan){x.tt='cho';x.loi='';ve();lan=lan||0;
 function chup(){const v=$('vid');if(!luong||!v.videoWidth)return null;const M=1280,s=Math.min(1,M/Math.max(v.videoWidth,v.videoHeight));
   const c=document.createElement('canvas');c.width=Math.round(v.videoWidth*s);c.height=Math.round(v.videoHeight*s);c.getContext('2d').drawImage(v,0,0,c.width,c.height);
   return c.toDataURL('image/jpeg',0.7);}
-async function batCam(){
+let dangMo=false,hong=false;
+async function batCam(tuDong){if(luong||dangMo)return;dangMo=true;try{await moCam(tuDong);}finally{dangMo=false;}}
+async function moCam(tuDong){
   if(!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)){$('batdau').innerHTML='<div class="loi">❌ Telegram trên máy này không cho trang dùng camera. Cập nhật Telegram, hoặc báo quản lý.</div>';return;}
-  try{luong=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},audio:false});}
-  catch(e){$('batdau').innerHTML='<div class="loi">❌ Không mở được camera: '+esc(e.name||e)+'<br>Cài đặt → Ứng dụng → Telegram → Quyền → cho phép Máy ảnh, rồi mở lại trang.</div>';return;}
+  try{luong=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},audio:false});if(hong){luong.getTracks().forEach(t=>t.stop());luong=null;return;}}
+  catch(e){luong=null;if(tuDong){$('nutBd').disabled=false;$('nutBd').textContent='📷 Bắt đầu quét';return;}$('batdau').innerHTML='<div class="loi">❌ Không mở được camera: '+esc(e.name||e)+'<br>Cài đặt → Ứng dụng → Telegram → Quyền → cho phép Máy ảnh, rồi mở lại trang.</div>';return;}
   const v=$('vid');v.srcObject=luong;try{await v.play();}catch(e){}
   $('batdau').style.display='none';
   try{if(ac)ac.resume();else ac=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}
   try{if('BarcodeDetector' in window){const f=await BarcodeDetector.getSupportedFormats();const can=['code_128','qr_code','code_39','ean_13','data_matrix'].filter(x=>f.indexOf(x)>=0);
     if(can.indexOf('code_128')>=0&&can.indexOf('qr_code')>=0)det=new BarcodeDetector({formats:can});}}catch(e){det=null;}
-  if(!det&&window.ZXing){const H=new Map();H.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[ZXing.BarcodeFormat.CODE_128,ZXing.BarcodeFormat.QR_CODE,ZXing.BarcodeFormat.CODE_39,ZXing.BarcodeFormat.EAN_13]);
-    H.set(ZXing.DecodeHintType.TRY_HARDER,true);zx=new ZXing.MultiFormatReader();zx.setHints(H);}
-  $('ban').textContent='Trang quét v2 · đọc mã: '+(det?'máy':'zxing')+' · '+((window.Telegram&&Telegram.WebApp.platform)||'?');
+  taoZx();hienBan();
   const tr=luong.getVideoTracks()[0];let cap={};try{cap=tr.getCapabilities?tr.getCapabilities():{};}catch(e){}if(!cap.torch)$('nDen').disabled=true;
   dang=true;vong();}
-$('nutBd').onclick=batCam;
+function taoZx(){if(det||zx||!window.ZXing)return;const H=new Map();H.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[ZXing.BarcodeFormat.CODE_128,ZXing.BarcodeFormat.QR_CODE,ZXing.BarcodeFormat.CODE_39,ZXing.BarcodeFormat.EAN_13]);
+  H.set(ZXing.DecodeHintType.TRY_HARDER,true);zx=new ZXing.MultiFormatReader();zx.setHints(H);hienBan();}
+function hienBan(){$('ban').textContent='Trang quét v3 · đọc mã: '+(det?'máy':zx?'zxing':'đang tải…')+' · '+((window.Telegram&&Telegram.WebApp.platform)||'?');}
+$('nutBd').onclick=()=>batCam(false);
+function tatQuet(){hong=true;dang=false;choTai.length=0;$('nutBd').disabled=true;if(luong){luong.getTracks().forEach(t=>t.stop());luong=null;}$('batdau').style.display='grid';}
 const cv=document.createElement('canvas');
 async function doc(){const v=$('vid');if(!v.videoWidth)return null;
   if(det){const r=await det.detect(v);return r.length?r[0].rawValue:null;}
-  if(!zx)return null;const W=v.videoWidth,Hh=v.videoHeight,cw=Math.min(960,W),ch=Math.round(Hh*cw/W);cv.width=cw;cv.height=ch;
+  if(!zx){taoZx();if(!zx)return null;}
+  const W=v.videoWidth,Hh=v.videoHeight,cw=Math.min(960,W),ch=Math.round(Hh*cw/W);cv.width=cw;cv.height=ch;
   cv.getContext('2d').drawImage(v,0,0,cw,ch);
   try{const src=new ZXing.HTMLCanvasElementLuminanceSource(cv);const bm=new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(src));return zx.decodeWithState(bm).getText();}
   catch(e){return null;}finally{try{zx.reset();}catch(e){}}}
@@ -180,12 +190,14 @@ $('nTay').onclick=()=>{const t=$('tay');t.style.display=t.style.display==='flex'
 $('guiTay').onclick=()=>{const v=$('oTay').value;if(v.trim()){ganDay.clear();nhan(v);$('oTay').value='';}};
 $('oTay').onkeydown=e=>{if(e.key==='Enter')$('guiTay').click();};
 // ---------- mở trang: lấy đơn hôm nay + danh sách đã có + đơn hủy
-goi('qt',{}).then(r=>{if(!r.ok){$('tt').innerHTML='<span class="loi">'+esc(r.loi)+'</span>';$('nutBd').textContent='Không mở được';return;}
+goi('qt',{}).then(r=>{if(!r.ok){$('tt').innerHTML='<span class="loi">'+esc(r.loi)+'</span>';tatQuet();$('nutBd').textContent='Không mở được';return;}
   tt=r;huy=r.huy||{};$('ten').textContent='👋 '+r.ten;
   ['DI','HOAN'].forEach(k=>{$('s'+k).disabled=r.quyen.indexOf(k)<0;(r.daCo[k]||[]).forEach(m=>daCo[k].add(m));
     ds[k]=(r.homNay[k]||[]).slice().reverse().map(x=>({ma:String(x.ma).toUpperCase(),loai:k,tt:'moi',stt:x.stt,gio:x.gio,ai:x.ai,tinh:x.tinh,lyDo:x.lyDo,soAnh:x.anh,anhs:[],cuaToi:x.ai===r.ten}));});
   $('tt').textContent='Quét liên tục · '+Object.keys(huy).length+' mã hủy đang theo dõi';
-  $('nutBd').disabled=false;$('nutBd').textContent='📷 Bắt đầu quét';
-  chonLoai(r.quyen.indexOf('DI')>=0?'DI':'HOAN');
+  if(r.quyen.indexOf(loai)<0)loai=r.quyen.indexOf('DI')>=0?'DI':'HOAN';chonLoai(loai);
+  choTai.splice(0).forEach(k=>{const i=k.indexOf('|'),l=k.slice(0,i),m=k.slice(i+1);if(r.quyen.indexOf(l)<0)return;const cu=loai;loai=l;ganDay.clear();nhan(m);loai=cu;});ve();
 }).catch(e=>{$('tt').innerHTML='<span class="loi">Không kết nối được máy chủ: '+esc(e)+'</span>';});
+// mở camera ngay, song song với lúc tải dữ liệu (không đợi bấm nút). Máy không cho tự mở thì hiện nút.
+batCam(true);
 </script></body></html>
