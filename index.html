@@ -29,7 +29,7 @@ h1{font-size:20px;margin:0 0 4px}.m{color:var(--m);font-size:14px}.r{display:fle
 <input type="file" id="cam" accept="image/*" capture="user" style="display:none">
 <img id="xem" alt=""><div class="m" style="margin-top:10px" id="ghi">Chụp ảnh mặt bằng camera trước. Ảnh chỉ dùng để đối chiếu chấm công.</div></div>
 <div class="k" id="kqK" style="display:none"><div id="kq"></div></div>
-<div class="m" style="text-align:center;font-size:12px" id="ban">Trang v4</div>
+<div class="m" style="text-align:center;font-size:12px" id="ban">Trang v5</div>
 <div id="camK"><video id="vid" playsinline autoplay muted></video><div id="camG">Nhìn thẳng vào camera rồi bấm nút chụp</div>
 <div class="camN"><button id="huyCam">Hủy</button><button id="chup">📸</button></div></div>
 </div><script>
@@ -93,6 +93,8 @@ function dongTrang(){
   try{window.top.postMessage(JSON.stringify({eventType:'web_app_close',eventData:{}}),'*');}catch(e){}
 }
 let luong=null,camSan=null;
+// iPhone: Telegram không nhớ quyền camera của trang, mở nào cũng hỏi -> dùng máy ảnh của điện thoại (không hỏi quyền)
+const IOS=(()=>{try{return Telegram.WebApp.platform==='ios';}catch(e){return /iPhone|iPad|iPod/.test(navigator.userAgent);}})();
 function tatCam(){if(luong){luong.getTracks().forEach(t=>t.stop());luong=null;}camSan=null;$('camK').style.display='none';}
 function layCam(){return navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:720},height:{ideal:720}},audio:false});}
 // mở sẵn camera ngầm ngay khi vào trang (song song với GPS và tải dữ liệu) để lúc bấm nút hiện ngay
@@ -117,7 +119,7 @@ $('chup').onclick=()=>{const v=$('vid');if(!v.videoWidth)return;
   const M=560,s=Math.min(1,M/Math.max(v.videoWidth,v.videoHeight)),c=document.createElement('canvas');
   c.width=Math.round(v.videoWidth*s);c.height=Math.round(v.videoHeight*s);c.getContext('2d').drawImage(v,0,0,c.width,c.height);
   tatCam();const d=c.toDataURL('image/jpeg',0.6);$('xem').src=d;$('xem').style.display='block';gui(d.split(',')[1],Date.now());};
-$('nut').onclick=()=>{if(!pos)return;if(canAnh())moCam();else gui('',0);};
+$('nut').onclick=()=>{if(!pos)return;if(canAnh()){if(IOS)$('cam').click();else moCam();}else gui('',0);};
 $('cam').onchange=e=>{const f=e.target.files[0];if(!f)return;const luc=f.lastModified||Date.now();
   thuNho(f,d=>{$('xem').src=d;$('xem').style.display='block';gui(d.split(',')[1],luc);});e.target.value='';};
 function hienHom(){
@@ -129,7 +131,7 @@ layInit(d=>{initData=d;goi('trangThaiApp',d,r=>{
   if(!r.ok){$('hom').innerHTML='<span class="no">'+r.loi+'</span>';return;}
   tt=r;$('ten').textContent='👋 '+r.ten;hienHom();if(pos)viTri({coords:pos});
   if(!tt.anhVao&&!tt.anhRa)tatCamSan();});});
-batGps();capNhat();if(!GAS)camTruoc();
-try{$('ban').textContent='Trang v4 · camera trực tiếp: '+((navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)?'có':'KHÔNG')+
+batGps();capNhat();if(!GAS&&!IOS)camTruoc();
+try{$('ban').textContent='Trang v5 · camera trực tiếp: '+((navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)?'có':'KHÔNG')+
   ' · '+((window.Telegram&&Telegram.WebApp&&Telegram.WebApp.platform)||'?')+' '+((window.Telegram&&Telegram.WebApp&&Telegram.WebApp.version)||'');}catch(e){}
 </script></body></html>
