@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="vi"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<title>Quét đơn Sapo</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<!-- Trang quét cho BotSapo: đọc 1 mã SPXVN…/SON… -> Telegram.WebApp.sendData(mã) -> trang tự đóng.
+     Không chứa token, không gọi máy chủ nào, không có dữ liệu khách. -->
+<style>
+:root{--bg:#0e0f0e;--fg:#f2f5f2;--muted:#a8b3aa;--accent:#3fbf74;--line:#2a312b;--warn:#ff7b6b}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{display:flex;flex-direction:column;padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0)}
+.cam{position:relative;flex:1;min-height:0;overflow:hidden;background:#000}
+video{width:100%;height:100%;object-fit:cover;display:block}
+.khung{position:absolute;left:10%;right:10%;top:32%;height:28%;border:2px solid var(--accent);border-radius:12px;box-shadow:0 0 0 2000px rgba(0,0,0,.35)}
+.khung::after{content:"";position:absolute;left:6px;right:6px;top:50%;height:2px;background:#ff5a4f;opacity:.85}
+.goiy{position:absolute;left:0;right:0;bottom:12px;text-align:center;font-size:13px;color:#dfe7df;text-shadow:0 1px 2px #000}
+.batdau{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:24px}
+.batdau button{all:unset;cursor:pointer;background:var(--accent);color:#06210f;font-weight:700;padding:14px 22px;border-radius:14px;font-size:16px}
+.loi{color:var(--warn);font-size:14px;max-width:32ch}
+.thanh{display:flex;gap:8px;padding:10px 12px 12px;border-top:1px solid var(--line)}
+.thanh button{all:unset;cursor:pointer;flex:1;text-align:center;padding:11px 6px;border-radius:12px;background:#1f2a22;color:#cfe9d6;font-weight:600}
+.thanh button[disabled]{opacity:.4;cursor:default}
+.thanh button.bat{background:var(--accent);color:#06210f}
+.tay{display:none;gap:8px;padding:0 12px 12px}
+.tay input{flex:1;min-width:0;background:#1a201b;border:1px solid var(--line);color:var(--fg);border-radius:12px;padding:11px 12px;font-size:16px;text-transform:uppercase}
+.tay button{all:unset;cursor:pointer;background:var(--accent);color:#06210f;font-weight:700;padding:11px 16px;border-radius:12px}
+.bao{min-height:20px;padding:0 12px 6px;font-size:13px;color:var(--muted)}
+</style></head><body>
+<div class="cam">
+  <video id="vid" playsinline muted autoplay></video>
+  <div class="khung"></div>
+  <div class="goiy">Đưa mã vạch / QR trên tem vào khung</div>
+  <div class="batdau" id="batdau"><button id="nutBd">📷 Bật camera</button></div>
+</div>
+<div class="bao" id="bao"></div>
+<div class="tay" id="tay"><input id="oTay" placeholder="SPXVN… hoặc SON…" autocomplete="off" inputmode="text"><button id="guiTay">Gửi</button></div>
+<div class="thanh">
+  <button id="nDen">🔦 Đèn</button>
+  <button id="nTay">⌨️ Gõ tay</button>
+  <button id="nDong">✖ Đóng</button>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const TG=window.Telegram&&Telegram.WebApp;
+try{TG.ready();TG.expand();TG.setHeaderColor&&TG.setHeaderColor('#0e0f0e');}catch(e){}
+// cùng luật với quetdon.tim_ma bên BotSapo
+const MA=/(SPXVN\d{9,12}[A-Z]?|(?<![0-9A-Z])SON\d{4,9}(?!\d))/;
+function timMa(s){s=String(s||'').toUpperCase();const m=s.replace(/\s+/g,'').match(MA)||s.match(MA);return m?m[1]:null;}
+let luong=null,det=null,zx=null,dang=false,den=false,xong=false,nhamLuc=0;
+function bao(t){$('bao').textContent=t||'';}
+function gui(ma){
+  if(xong)return;xong=true;dang=false;
+  try{navigator.vibrate&&navigator.vibrate(120);}catch(e){}
+  try{TG.HapticFeedback&&TG.HapticFeedback.notificationOccurred('success');}catch(e){}
+  bao('✓ '+ma+' – đang gửi về bot…');
+  try{luong&&luong.getTracks().forEach(t=>t.stop());}catch(e){}
+  try{TG.sendData(ma);}catch(e){xong=false;bao('❌ Không gửi được: mở trang bằng nút 📷 Quét trong bot.');}
+}
+function nhan(t){const ma=timMa(t);if(ma)return gui(ma);
+  const n=Date.now();if(n-nhamLuc>2500){nhamLuc=n;bao('Mã không phải SPXVN…/SON…: '+String(t).slice(0,30));}}
+function napZxing(){return new Promise(ok=>{const s=document.createElement('script');
+  s.src='https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js';s.onload=()=>ok(true);s.onerror=()=>ok(false);document.head.appendChild(s);});}
+async function batCam(){
+  if(!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)){$('batdau').innerHTML='<div class="loi">❌ Telegram trên máy này không cho trang dùng camera. Dùng ⌨️ Gõ tay.</div>';return;}
+  try{luong=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},audio:false});}
+  catch(e){$('batdau').innerHTML='<div class="loi">❌ Chưa mở được camera ('+(e.name||e)+').<br>Cho Telegram quyền Máy ảnh rồi bấm lại.<br><br></div>';
+    const b=document.createElement('button');b.textContent='📷 Thử lại';b.onclick=batCam;$('batdau').appendChild(b);return;}
+  const v=$('vid');v.srcObject=luong;try{await v.play();}catch(e){}
+  $('batdau').style.display='none';
+  try{if('BarcodeDetector' in window){const f=await BarcodeDetector.getSupportedFormats();
+    const can=['code_128','qr_code','code_39','data_matrix'].filter(x=>f.indexOf(x)>=0);
+    if(can.indexOf('code_128')>=0)det=new BarcodeDetector({formats:can});}}catch(e){det=null;}
+  if(!det){bao('Đang tải bộ đọc mã…');if(await napZxing()&&window.ZXing){const H=new Map();
+    H.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[ZXing.BarcodeFormat.CODE_128,ZXing.BarcodeFormat.QR_CODE,ZXing.BarcodeFormat.CODE_39]);
+    H.set(ZXing.DecodeHintType.TRY_HARDER,true);zx=new ZXing.MultiFormatReader();zx.setHints(H);bao('');}
+    else bao('❌ Không tải được bộ đọc mã – dùng ⌨️ Gõ tay.');}
+  let cap={};try{const tr=luong.getVideoTracks()[0];cap=tr.getCapabilities?tr.getCapabilities():{};}catch(e){}
+  if(!cap.torch)$('nDen').disabled=true;
+  dang=true;vong();}
+const cv=document.createElement('canvas');
+async function doc(){const v=$('vid');if(!v.videoWidth)return null;
+  if(det){const r=await det.detect(v);for(const x of r){if(timMa(x.rawValue))return x.rawValue;}return r.length?r[0].rawValue:null;}
+  if(!zx)return null;const W=v.videoWidth,H=v.videoHeight,cw=Math.min(960,W),ch=Math.round(H*cw/W);cv.width=cw;cv.height=ch;
+  cv.getContext('2d').drawImage(v,0,0,cw,ch);
+  try{const bm=new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(new ZXing.HTMLCanvasElementLuminanceSource(cv)));return zx.decodeWithState(bm).getText();}
+  catch(e){return null;}finally{try{zx.reset();}catch(e){}}}
+async function vong(){if(!dang)return;try{const t=await doc();if(t)nhan(t);}catch(e){}if(dang)setTimeout(vong,det?120:220);}
+$('nutBd').onclick=batCam;
+$('nDen').onclick=async()=>{if(!luong)return;den=!den;try{await luong.getVideoTracks()[0].applyConstraints({advanced:[{torch:den}]});$('nDen').classList.toggle('bat',den);}catch(e){den=false;}};
+$('nTay').onclick=()=>{const t=$('tay');t.style.display=t.style.display==='flex'?'none':'flex';if(t.style.display==='flex')$('oTay').focus();};
+$('guiTay').onclick=()=>{const v=$('oTay').value.trim();if(!v)return;const ma=timMa(v);if(ma)gui(ma);else bao('Gõ đúng mã SPXVN… hoặc SON…');};
+$('oTay').onkeydown=e=>{if(e.key==='Enter')$('guiTay').click();};
+$('nDong').onclick=()=>{try{TG.close();}catch(e){history.back();}};
+batCam();   // mở là bật camera ngay; máy nào bắt bấm tay thì hiện nút "Bật camera"/"Thử lại"
+</script>
+</body></html>
