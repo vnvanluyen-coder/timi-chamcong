@@ -86,6 +86,15 @@ function tach(h){h=String(h||'').replace(/^#/,'');const i=h.indexOf('tgWebAppDat
   const j=v.search(/&tgWebApp[A-Za-z]+=/);if(j>=0)v=v.slice(0,j);if(v.indexOf('=')<0){try{v=decodeURIComponent(v);}catch(e){}}return v;}
 try{initData=(window.Telegram&&Telegram.WebApp&&Telegram.WebApp.initData)||tach(location.hash);}catch(e){initData=tach(location.hash);}
 function goi(app,body){return fetch(EXEC+'?app='+app,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(Object.assign({initData},body))}).then(r=>r.json());}
+// ghi đơn: gửi máy chủ nhanh (Cloudflare) nếu Apps Script đã cấp vé; lỗi mạng/máy chủ thì gửi Apps Script như cũ
+function ghiDon(b){if(!(tt&&tt.nhanh&&tt.ve))return goi('qd',b);
+  const ac=new AbortController(),hen=setTimeout(()=>ac.abort(),6000);
+  return fetch(tt.nhanh,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(Object.assign({ve:tt.ve},b)),signal:ac.signal})
+    .then(r=>r.json()).then(r=>{clearTimeout(hen);return r.loiMay?duPhong(b):r;}).catch(()=>{clearTimeout(hen);return duPhong(b);});}
+function duPhong(b){return goi('qd',b).then(r=>{     // máy chủ nhanh có thể đã ghi rồi mới mất kết nối -> báo trùng chính mình thì coi như đã ghi
+  if(r.chan==='TRUNG'&&r.ai===tt.ten&&vuaQuet(r.luc))return{ok:true,moi:true,ma:r.ma,stt:r.stt,gio:String(r.luc).slice(11,16)};return r;});}
+function vuaQuet(luc){const m=String(luc||'').match(/^(\d\d)\/(\d\d)\/(\d{4}) (\d\d):(\d\d)/);if(!m)return false;
+  const t=Date.UTC(+m[3],m[2]-1,+m[1],+m[4]-7,+m[5]);return Math.abs(Date.now()-t)<5*60000;}
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 // ---------- âm thanh, rung
 let ac=null;
@@ -143,11 +152,11 @@ function nhan(raw){if(popMo)return;const ma=chuan(raw);if(ma.length<6)return;
   const l=loai,now=Date.now();
   if(ganDay.has(l+ma)&&now-ganDay.get(l+ma)<3000)return;ganDay.set(l+ma,now);
   if(l==='DI'&&/^FUN/.test(ma)){popup('FUN',ma,ND.FUN);return;}
-  if(daCo[l].has(ma)){popup('TRUNG',ma,ND.TRUNG(null));goi('qd',{loai:l,ma}).then(r=>{if(r.chan==='TRUNG')capNhatPop(ma,ND.TRUNG(r));}).catch(()=>{});return;}
+  if(daCo[l].has(ma)){popup('TRUNG',ma,ND.TRUNG(null));ghiDon({loai:l,ma}).then(r=>{if(r.chan==='TRUNG')capNhatPop(ma,ND.TRUNG(r));}).catch(()=>{});return;}
   if(l==='DI'&&huy[ma]){popup('HUY',ma,ND.HUY(Object.assign({loaiHuy:huy[ma].loai},huy[ma])));return;}
   daCo[l].add(ma);const x={ma,loai:l,tt:'cho',gio:gioNay(),anhs:[],cuaToi:true,ai:tt.ten};ds[l].unshift(x);tieng('ok');bao('✓ '+ma);ve();gui(x);}
 function gui(x,lan){x.tt='cho';x.loi='';ve();lan=lan||0;
-  goi('qd',{loai:x.loai,ma:x.ma}).then(r=>{
+  ghiDon({loai:x.loai,ma:x.ma}).then(r=>{
     if(!r.ok){x.tt='loi';x.loi=r.text;tieng('loi');ve();return;}
     if(r.chan){x.tt='xoa';ve();popup(r.chan,x.ma,r.chan==='FUN'?ND.FUN:r.chan==='HUY'?ND.HUY(r):ND.TRUNG(r));return;}
     x.tt='moi';x.stt=r.stt;x.gio=r.gio||x.gio;x.donDi=r.donDi;ve();
