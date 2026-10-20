@@ -148,7 +148,10 @@ function hanhDong(x,a,v){
   if(a==='anh'){const s=chup();if(!s){bao('Bật camera trước');return;}const o={src:s,ok:false};x.anhs.push(o);ve();
     goi('qc',{loai:x.loai,ma:x.ma,anh:s.split(',')[1]}).then(r=>{o.ok=r.ok;o.loi=!r.ok;if(!r.ok)x.loi=r.text;ve();}).catch(()=>{o.loi=true;x.loi='Mất mạng – ảnh chưa lưu';ve();});return;}
   if(a==='xoa'){if(x.hoiXoa!==1){x.hoiXoa=1;bao('Bấm 🗑 Xóa lần nữa để xóa '+x.ma);setTimeout(()=>x.hoiXoa=0,4000);return;}
-    goi('qx',{loai:x.loai,ma:x.ma}).then(r=>{if(r.ok){x.tt='xoa';daCo[x.loai].delete(x.ma);}else x.loi=r.text;ve();}).catch(()=>{x.loi='Mất mạng';ve();});}
+    const xoaGS=()=>goi('qx',{loai:x.loai,ma:x.ma}).then(r=>{if(r.ok){x.tt='xoa';daCo[x.loai].delete(x.ma);}else x.loi=r.text;ve();}).catch(()=>{x.loi='Mất mạng';ve();});
+    if(!(tt&&tt.nhanh&&tt.ve)){xoaGS();return;}     // máy chủ nhanh bỏ mã khỏi kho (còn chờ lên Sheet thì xong luôn), rồi mới xoá trên Sheet
+    fetch(tt.nhanh,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({ve:tt.ve,xoa:1,loai:x.loai,ma:x.ma})}).then(r=>r.json())
+      .then(r=>{if(r.ok&&r.xongHang){x.tt='xoa';daCo[x.loai].delete(x.ma);ve();}else xoaGS();}).catch(xoaGS);}
 }
 // ---------- quét được mã
 function gioNay(){return new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'});}
@@ -191,7 +194,7 @@ async function moCam(tuDong){
   dang=true;vong();}
 function taoZx(){if(det||zx||!window.ZXing)return;const H=new Map();H.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[ZXing.BarcodeFormat.CODE_128,ZXing.BarcodeFormat.QR_CODE,ZXing.BarcodeFormat.CODE_39,ZXing.BarcodeFormat.EAN_13]);
   H.set(ZXing.DecodeHintType.TRY_HARDER,true);zx=new ZXing.MultiFormatReader();zx.setHints(H);hienBan();}
-function hienBan(){$('ban').textContent='Trang quét v4 · đọc mã: '+(det?'máy':zx?'zxing':'đang tải…')+' · '+((window.Telegram&&Telegram.WebApp.platform)||'?');}
+function hienBan(){$('ban').textContent='Trang quét v5 · đọc mã: '+(det?'máy':zx?'zxing':'đang tải…')+' · '+((window.Telegram&&Telegram.WebApp.platform)||'?');}
 $('nutBd').onclick=()=>batCam(false);
 function tatQuet(){hong=true;dang=false;choTai.length=0;$('nutBd').disabled=true;if(luong){luong.getTracks().forEach(t=>t.stop());luong=null;}$('batdau').style.display='grid';}
 const cv=document.createElement('canvas');
