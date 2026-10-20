@@ -155,11 +155,11 @@ function nhan(raw){if(popMo)return;const ma=chuan(raw);if(ma.length<6)return;
   if(daCo[l].has(ma)){popup('TRUNG',ma,ND.TRUNG(null));ghiDon({loai:l,ma}).then(r=>{if(r.chan==='TRUNG')capNhatPop(ma,ND.TRUNG(r));}).catch(()=>{});return;}
   if(l==='DI'&&huy[ma]){popup('HUY',ma,ND.HUY(Object.assign({loaiHuy:huy[ma].loai},huy[ma])));return;}
   daCo[l].add(ma);const x={ma,loai:l,tt:'cho',gio:gioNay(),anhs:[],cuaToi:true,ai:tt.ten};ds[l].unshift(x);tieng('ok');bao('✓ '+ma);ve();gui(x);}
-function gui(x,lan){x.tt='cho';x.loi='';ve();lan=lan||0;
+function gui(x,lan){x.tt='cho';x.loi='';ve();lan=lan||0;const t0=Date.now();
   ghiDon({loai:x.loai,ma:x.ma}).then(r=>{
     if(!r.ok){x.tt='loi';x.loi=r.text;tieng('loi');ve();return;}
     if(r.chan){x.tt='xoa';ve();popup(r.chan,x.ma,r.chan==='FUN'?ND.FUN:r.chan==='HUY'?ND.HUY(r):ND.TRUNG(r));return;}
-    x.tt='moi';x.stt=r.stt;x.gio=r.gio||x.gio;x.donDi=r.donDi;ve();
+    x.tt='moi';x.stt=r.stt;x.gio=r.gio||x.gio;x.donDi=r.donDi;ve();bao((r.nhanh?'⚡ ':'✓ ')+'Đã lưu '+x.ma+' · '+((Date.now()-t0)/1000).toFixed(1)+' giây');
   }).catch(()=>{x.tt='loi';x.loi='Mất mạng – tự gửi lại';ve();if(lan<20)setTimeout(()=>gui(x,lan+1),4000);});}
 // ---------- camera & đọc mã
 function chup(){const v=$('vid');if(!luong||!v.videoWidth)return null;const M=1280,s=Math.min(1,M/Math.max(v.videoWidth,v.videoHeight));
