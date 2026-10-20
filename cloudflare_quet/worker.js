@@ -44,7 +44,7 @@ export class KhoaQuet {
     if (this.tok && Date.now() < this.hetTok) return this.tok;
     const luu = await this.state.storage.get('tok');           // giữ quyền Google qua các lần Cloudflare tắt/bật lại đối tượng
     if (luu && Date.now() < luu.het) { this.tok = luu.tok; this.hetTok = luu.het; return this.tok; }
-    const sa = JSON.parse(this.env.GOOGLE_SA);
+    const sa = JSON.parse(String(this.env.GOOGLE_SA).trim());   // trim: bỏ ký tự BOM PowerShell chèn khi cất khoá
     const now = Math.floor(Date.now() / 1000);
     const enc = o => b64url(new TextEncoder().encode(JSON.stringify(o))).replace(/=+$/, '');
     const dau = enc({ alg: 'RS256', typ: 'JWT' }) + '.' + enc({ iss: sa.client_email, scope: 'https://www.googleapis.com/auth/spreadsheets',
