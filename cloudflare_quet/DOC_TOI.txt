@@ -1,0 +1,5 @@
+Máy chủ ghi đơn quét nhanh (Cloudflare Workers) cho bot quét đơn @timiquetdonbot.
+- worker.js: nhận mã từ trang quét (quet.html), kiểm vé do Apps Script cấp, chặn trùng/FUN/đơn huỷ, đánh STT, ghi thẳng Google Sheet "Danh Sách ĐH" bằng service account.
+- Trang quét tự quay về Apps Script nếu máy chủ này lỗi.
+- Cài: chạy CAI_DAT.bat trên máy bàn (bản trong D:\Bot\BotSapo\quet_nhanh\).
+- Tắt: xoá file bi_mat_ve.js trong thư mục clasp rồi clasp push + deploy -> trang quét dùng lại Apps Script.
