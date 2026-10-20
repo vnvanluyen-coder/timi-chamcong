@@ -194,7 +194,7 @@ async function moCam(tuDong){
   dang=true;vong();}
 function taoZx(){if(det||zx||!window.ZXing)return;const H=new Map();H.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[ZXing.BarcodeFormat.CODE_128,ZXing.BarcodeFormat.QR_CODE,ZXing.BarcodeFormat.CODE_39,ZXing.BarcodeFormat.EAN_13]);
   H.set(ZXing.DecodeHintType.TRY_HARDER,true);zx=new ZXing.MultiFormatReader();zx.setHints(H);hienBan();}
-function hienBan(){$('ban').textContent='Trang quét v5 · đọc mã: '+(det?'máy':zx?'zxing':'đang tải…')+' · '+((window.Telegram&&Telegram.WebApp.platform)||'?');}
+function hienBan(){$('ban').textContent='Trang quét v6 · đọc mã: '+(det?'máy':zx?'zxing':'đang tải…')+' · '+((window.Telegram&&Telegram.WebApp.platform)||'?');}
 $('nutBd').onclick=()=>batCam(false);
 function tatQuet(){hong=true;dang=false;choTai.length=0;$('nutBd').disabled=true;if(luong){luong.getTracks().forEach(t=>t.stop());luong=null;}$('batdau').style.display='grid';}
 const cv=document.createElement('canvas');
@@ -212,7 +212,23 @@ $('nTay').onclick=()=>{const t=$('tay');t.style.display=t.style.display==='flex'
 $('guiTay').onclick=()=>{const v=$('oTay').value;if(v.trim()){ganDay.clear();nhan(v);$('oTay').value='';}};
 $('oTay').onkeydown=e=>{if(e.key==='Enter')$('guiTay').click();};
 // ---------- mở trang: lấy đơn hôm nay + danh sách đã có + đơn hủy
-goi('qt',{}).then(r=>{if(!r.ok){$('tt').innerHTML='<span class="loi">'+esc(r.loi)+'</span>';tatQuet();$('nutBd').textContent='Không mở được';return;}
+// vé máy chủ nhanh giữ trên điện thoại: lần mở sau lấy danh sách từ Cloudflare (nhanh), Google chỉ chạy ngầm để cấp vé mới
+const KVE='timi_quet_ve';
+function luuVe(r){try{if(r&&r.ok&&r.nhanh&&r.ve)localStorage.setItem(KVE,JSON.stringify({nhanh:r.nhanh,ve:r.ve}));}catch(e){}}
+function veCu(){try{const x=JSON.parse(localStorage.getItem(KVE)||'null');if(!x||!x.ve||!x.nhanh)return null;
+  const e=JSON.parse(atob(x.ve.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'))).e;return e-Date.now()>3600000?x:null;}catch(e){return null;}}
+function uidTg(){try{return String(Telegram.WebApp.initDataUnsafe.user.id||'');}catch(e){return'';}}
+function hoiNhanh(nhanh,ve,ms){const ac=new AbortController(),hen=setTimeout(()=>ac.abort(),ms);
+  return fetch(nhanh,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({ve,trangThai:1}),signal:ac.signal}).then(r=>r.json())
+    .then(r=>{clearTimeout(hen);if(!r.ok)throw 0;return r;},e=>{clearTimeout(hen);throw e;});}
+function loiMo(e){$('tt').innerHTML='<span class="loi">Không kết nối được máy chủ: '+esc(e)+'</span>';}
+function quaGoogle(){return goi('qt',{}).then(r=>{luuVe(r);batDau(r);}).catch(loiMo);}
+function moTrang(){const c=veCu();if(!c)return quaGoogle();
+  hoiNhanh(c.nhanh,c.ve,4000).then(r=>{const uid=uidTg();if(uid&&String(r.u)!==uid)throw 0;r.nhanh=c.nhanh;r.ve=c.ve;batDau(r);
+    goi('qt',{}).then(r2=>{if(r2.ok){luuVe(r2);tt.ve=r2.ve||tt.ve;tt.quyen=r2.quyen;}
+      else{try{localStorage.removeItem(KVE);}catch(e){}$('tt').innerHTML='<span class="loi">'+esc(r2.loi)+'</span>';tatQuet();}}).catch(()=>{});
+  }).catch(quaGoogle);}
+function batDau(r){if(!r.ok){$('tt').innerHTML='<span class="loi">'+esc(r.loi)+'</span>';tatQuet();$('nutBd').textContent='Không mở được';return;}
   tt=r;huy=r.huy||{};$('ten').textContent='👋 '+r.ten;
   ['DI','HOAN'].forEach(k=>{$('s'+k).disabled=r.quyen.indexOf(k)<0;(r.daCo[k]||[]).forEach(m=>daCo[k].add(m));
     ds[k]=(r.homNay[k]||[]).slice().reverse().map(x=>({ma:String(x.ma).toUpperCase(),loai:k,tt:'moi',stt:x.stt,gio:x.gio,ai:x.ai,tinh:x.tinh,lyDo:x.lyDo,soAnh:x.anh,anhs:[],cuaToi:x.ai===r.ten}));});
@@ -222,9 +238,10 @@ goi('qt',{}).then(r=>{if(!r.ok){$('tt').innerHTML='<span class="loi">'+esc(r.loi
   setInterval(lamMoi,60000);
   if(r.quyen.indexOf(loai)<0)loai=r.quyen.indexOf('DI')>=0?'DI':'HOAN';chonLoai(loai);
   choTai.splice(0).forEach(k=>{const i=k.indexOf('|'),l=k.slice(0,i),m=k.slice(i+1);if(r.quyen.indexOf(l)<0)return;const cu=loai;loai=l;ganDay.clear();nhan(m);loai=cu;});ve();
-}).catch(e=>{$('tt').innerHTML='<span class="loi">Không kết nối được máy chủ: '+esc(e)+'</span>';});
+}
+moTrang();
 // mỗi phút lấy lại danh sách đã quét (của cả người khác) + đơn hủy, để đối chiếu trên điện thoại luôn mới
-function lamMoi(){if(document.hidden||!tt)return;goi('qt',{}).then(r=>{if(!r.ok)return;huy=r.huy||huy;if(r.ve)tt.ve=r.ve;
+function lamMoi(){if(document.hidden||!tt)return;(tt.nhanh&&tt.ve?hoiNhanh(tt.nhanh,tt.ve,6000).catch(()=>goi('qt',{})):goi('qt',{})).then(r=>{if(!r.ok)return;huy=r.huy||huy;if(r.ve)tt.ve=r.ve;
   ['DI','HOAN'].forEach(k=>{(r.daCo[k]||[]).forEach(m=>daCo[k].add(m));
     (r.homNay[k]||[]).forEach(y=>{const ma=String(y.ma).toUpperCase();if(ds[k].some(z=>z.ma===ma))return;
       ds[k].push({ma,loai:k,tt:'moi',stt:y.stt,gio:y.gio,ai:y.ai,tinh:y.tinh,lyDo:y.lyDo,soAnh:y.anh,anhs:[],cuaToi:y.ai===tt.ten});});
