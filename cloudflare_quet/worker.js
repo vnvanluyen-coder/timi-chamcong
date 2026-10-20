@@ -25,7 +25,7 @@ export class KhoaQuet {
   async fetch(req) {
     let p;
     try { p = await req.json(); } catch (e) { return json({ ok: false, text: 'Dữ liệu gửi lên không đọc được.' }); }
-    const viec = this.xep.then(() => p.xoa ? this.xoaDon(p) : this.quetDon(p));
+    const viec = this.xep.then(() => p.xoa ? this.xoaDon(p) : p.trangThai ? this.trangThai(p) : this.quetDon(p));
     this.xep = viec.catch(() => {});
     try { return json(await viec); } catch (e) { return json({ ok: false, text: String(e.message || e), loiMay: true }); }
   }
@@ -178,6 +178,24 @@ export class KhoaQuet {
       }
     }
     kq.ms = Date.now() - t0;
+    return kq;
+  }
+
+  // ----- mở trang: danh sách hôm nay + mã đã có + đơn hủy, lấy từ kho (giống quetTrangThai trong ChamCong.js)
+  async trangThai(p) {
+    const v = await this.kiemVe(p.ve);
+    if (!(v.q || []).length) return { ok: false, loi: 'Bạn chưa được cấp quyền quét đơn.' };
+    await this.napCho();
+    if (!this.kho || Date.now() - this.kho.luc > 60000) this.kho = await this.docSheet();
+    const hn = gioVN().ngay, kq = { ok: true, ten: v.t, quyen: v.q, u: v.u, homNay: {}, daCo: {}, huy: {}, nhanh: true };
+    for (const r of this.kho.huy) { const k = String(r[0] || '').trim().toUpperCase(); if (k) kq.huy[k] = { maDon: r[1] || '', loai: r[2] || '', luc: r[3] || '', khach: r[4] || '' }; }
+    for (const l of v.q) {
+      const b = this.kho[l], o = (r, ten) => this.doc(b, r, ten), ds = this.dsDong(l);
+      kq.daCo[l] = ds.map(r => o(r, 'Mã vận đơn').trim().toUpperCase()).filter(String);
+      kq.homNay[l] = ds.filter(r => o(r, 'Ngày giờ quét').indexOf(hn) === 0).map(r => ({ ma: o(r, 'Mã vận đơn'), stt: o(r, 'STT'),
+        gio: o(r, 'Ngày giờ quét').slice(11, 16), ai: o(r, 'Người quét'), anh: o(r, 'Ảnh') ? o(r, 'Ảnh').split('\n').length : 0,
+        tinh: o(r, 'Tình trạng hàng'), lyDo: o(r, 'Lý do') }));
+    }
     return kq;
   }
 
