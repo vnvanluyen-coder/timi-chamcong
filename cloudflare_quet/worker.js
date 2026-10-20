@@ -1,4 +1,4 @@
-// Ghi đơn quét nhanh vào Google Sheet "Danh Sách ĐH" (thay bước ghi qua Apps Script, ~2s -> <1s).
+// Ghi đơn quét nhanh vào Google Sheet "Danh Sách ĐH" (thay bước ghi qua Apps Script): lưu kho Cloudflare trước, trả lời ngay, ghi Sheet ngầm.
 // Trang quét lấy "vé" từ Apps Script lúc mở (quetTrangThai, đã xác thực Telegram + quyền), gửi vé + mã về đây.
 // Bí mật (wrangler secret): VE_KHOA (chung với Apps Script), GOOGLE_SA (nội dung credentials.json).
 const SHEET_ID = '1-uxpKDh-1bBvVS4VI6xHSi1o5IeYHKwtBVYMDiowgtw';
@@ -18,14 +18,18 @@ export default {
 };
 
 export class KhoaQuet {
-  constructor(state, env) { this.state = state; this.env = env; this.tok = null; this.hetTok = 0; this.hang = Promise.resolve(); }
+  // Kho tạm: bản sao Sheet trong bộ nhớ (đọc lại sau mỗi lần ghi, hoặc khi cũ hơn 60s) + hàng chờ ghi cất trong ổ của Cloudflare.
+  // Quét: đối chiếu với kho, cất vào hàng chờ, trả lời ngay; ghi Sheet chạy ngầm ngay sau đó (lỗi thì 30s thử lại).
+  constructor(state, env) { this.state = state; this.env = env; this.tok = null; this.hetTok = 0; this.xep = Promise.resolve();
+    this.kho = null; this.cho = null; this.dayP = null; }
   async fetch(req) {
     let p;
     try { p = await req.json(); } catch (e) { return json({ ok: false, text: 'Dữ liệu gửi lên không đọc được.' }); }
-    const viec = this.hang.then(() => this.quetDon(p));
-    this.hang = viec.catch(() => {});
+    const viec = this.xep.then(() => p.xoa ? this.xoaDon(p) : this.quetDon(p));
+    this.xep = viec.catch(() => {});
     try { return json(await viec); } catch (e) { return json({ ok: false, text: String(e.message || e), loiMay: true }); }
   }
+  async alarm() { await this.napCho(); if (this.cho.length) await this.day(); }
 
   // ----- xác thực vé
   async kiemVe(ve) {
@@ -68,6 +72,58 @@ export class KhoaQuet {
     return j;
   }
 
+  // ----- kho: đọc 3 bảng trong 1 lần gọi
+  async docSheet() {
+    const ranges = [q(QDON.DI.tab) + '!A1:AZ', q(QDON.HOAN.tab) + '!A1:AZ', 'DON_HUY!A2:E'];
+    const bg = await this.g('/values:batchGet?valueRenderOption=FORMATTED_VALUE&' + ranges.map(r => 'ranges=' + encodeURIComponent(r)).join('&'));
+    const bang = i => { const all = bg.valueRanges[i].values || [[]]; return { h: all[0] || [], rows: all.slice(1), soDong: all.length }; };
+    return { luc: Date.now(), DI: bang(0), HOAN: bang(1), huy: bg.valueRanges[2].values || [] };
+  }
+  async napCho() { if (!this.cho) this.cho = (await this.state.storage.get('cho')) || []; }
+  async catCho() {
+    await this.state.storage.put('cho', this.cho);
+    if (this.cho.length && !(await this.state.storage.getAlarm())) await this.state.storage.setAlarm(Date.now() + 30000);
+  }
+  // dòng của bảng (mảng theo tiêu đề) hoặc của hàng chờ (đối tượng) -> đọc theo tên cột
+  doc(b, r, ten) { if (!Array.isArray(r)) return r[ten] == null ? '' : String(r[ten]); const i = b.h.indexOf(ten); return i < 0 || r[i] == null ? '' : String(r[i]); }
+  dsDong(loai) { const b = this.kho[loai]; return b.rows.concat(this.cho.filter(x => x.loai === loai).map(x => x.o)); }
+
+  // ----- ghi hàng chờ lên Sheet (chạy ngầm, mỗi lúc 1 lượt)
+  day() {
+    if (this.dayP) { this.dayLai = true; return this.dayP; }
+    this.dayP = (async () => {
+      try { do { this.dayLai = false; await this.dayMot(); } while (this.dayLai); }
+      catch (e) { this.loiDay = String(e.message || e); try { await this.state.storage.setAlarm(Date.now() + 30000); } catch (e2) {} }
+      finally { this.dayP = null; }
+    })();
+    return this.dayP;
+  }
+  async dayMot() {
+    await this.napCho();
+    const lo = this.cho.slice();                     // lượt này ghi những mã đang chờ lúc bắt đầu
+    const moi = await this.docSheet();
+    for (const loai of ['DI', 'HOAN']) {
+      const b = moi[loai], tab = QDON[loai].tab;
+      const thieu = QDON[loai].them.filter(x => b.h.indexOf(x) < 0);
+      const co = new Set(b.rows.map(r => this.doc(b, r, 'Mã vận đơn').trim().toUpperCase()));
+      const ghi = lo.filter(x => x.loai === loai && !co.has(x.ma));   // đã có trên Sheet (vd. ghi qua Apps Script) thì thôi
+      if (!ghi.length) continue;
+      if (thieu.length) {
+        await this.g('/values/' + encodeURIComponent(q(tab) + '!' + cot(b.h.length + 1) + '1') + '?valueInputOption=RAW',
+          { method: 'PUT', body: JSON.stringify({ values: [thieu] }) });
+        b.h = b.h.concat(thieu);
+      }
+      const dong = ghi.map(x => b.h.map(ten => x.o[ten] == null ? '' : x.o[ten]));
+      await this.g('/values/' + encodeURIComponent(q(tab) + '!A' + (b.soDong + 1)) + '?valueInputOption=USER_ENTERED',
+        { method: 'PUT', body: JSON.stringify({ values: dong }) });
+      b.rows = b.rows.concat(dong); b.soDong += dong.length;
+    }
+    const xong = new Set(lo.map(x => x.id));
+    this.cho = this.cho.filter(x => !xong.has(x.id));
+    await this.catCho();
+    this.kho = moi; this.loiDay = '';
+  }
+
   // ----- quét 1 mã: giống quetDon trong ChamCong.js
   async quetDon(p) {
     const t0 = Date.now();
@@ -78,70 +134,64 @@ export class KhoaQuet {
     if (ma.length < 6) return { ok: false, text: 'Mã quá ngắn: ' + ma };
     if (loai === 'DI' && /^FUN/i.test(ma)) return { ok: true, chan: 'FUN', ma: ma };
 
-    const tab = QDON[loai].tab;
-    const t1 = Date.now(); await this.token(); const tQ = Date.now() - t1;
-    const ranges = [q(tab) + '!A1:AZ'];
-    if (loai === 'DI') ranges.push('DON_HUY!A2:E');
-    else ranges.push(q(QDON.DI.tab) + '!A1:AZ');
-    const bg = await this.g('/values:batchGet?valueRenderOption=FORMATTED_VALUE&' + ranges.map(r => 'ranges=' + encodeURIComponent(r)).join('&'));
-    const tD = Date.now() - t1 - tQ;
-    const all = bg.valueRanges[0].values || [[]];
-    let h = all[0] || [];
-    const rows = all.slice(1);
-    const thieu = QDON[loai].them.filter(x => h.indexOf(x) < 0);
-    if (thieu.length) {
-      await this.g('/values/' + encodeURIComponent(q(tab) + '!' + cot(h.length + 1) + '1') + '?valueInputOption=RAW',
-        { method: 'PUT', body: JSON.stringify({ values: [thieu] }) });
-      h = h.concat(thieu);
+    await this.napCho();
+    let tD = 0;
+    if (!this.kho || Date.now() - this.kho.luc > 60000) {      // kho cũ (nghỉ quét >1 phút) -> đọc lại Sheet trước
+      const t1 = Date.now();
+      try { this.kho = await this.docSheet(); } catch (e) { if (!this.kho) throw e; }
+      tD = Date.now() - t1;
     }
-    const c = ten => h.indexOf(ten) + 1;
-    const o = (r, ten) => (c(ten) ? String(r[c(ten) - 1] == null ? '' : r[c(ten) - 1]) : '');
-
-    for (let i = rows.length - 1; i >= 0; i--) {
-      if (o(rows[i], 'Mã vận đơn').trim().toUpperCase() !== ma) continue;
-      const r = rows[i];
+    const b = this.kho[loai], o = (r, ten) => this.doc(b, r, ten);
+    const ds = this.dsDong(loai);
+    for (let i = ds.length - 1; i >= 0; i--) {
+      if (o(ds[i], 'Mã vận đơn').trim().toUpperCase() !== ma) continue;
+      const r = ds[i];
       return { ok: true, chan: 'TRUNG', ma: ma, luc: o(r, 'Ngày giờ quét'), ai: o(r, 'Người quét'), stt: o(r, 'STT'), tt: o(r, 'Trạng thái giao hàng') };
     }
     if (loai === 'DI') {
-      for (const r of (bg.valueRanges[1].values || [])) {
+      for (const r of this.kho.huy) {
         if (String(r[0] || '').trim().toUpperCase() === ma)
           return { ok: true, chan: 'HUY', ma: ma, maDon: r[1] || '', loaiHuy: r[2] || '', luc: r[3] || '', khach: r[4] || '' };
       }
     }
     const now = gioVN(), hn = now.ngay;
-    const homNay = rows.filter(r => o(r, 'Ngày giờ quét').indexOf(hn) === 0);
-    const dong = new Array(h.length).fill('');
-    const dat = (ten, gt) => { if (c(ten)) dong[c(ten) - 1] = gt; };
-    dat('ID', idNgauNhien());
-    dat('Mã vận đơn', ma);
-    dat('Ngày giờ quét', now.day);
-    dat('Người quét', v.t);
+    const homNay = ds.filter(r => o(r, 'Ngày giờ quét').indexOf(hn) === 0);
+    const dong = { 'ID': idNgauNhien(), 'Mã vận đơn': ma, 'Ngày giờ quét': now.day, 'Người quét': v.t };
     let stt = '';
     if (loai === 'DI') {           // STT đánh lại từ 1 mỗi ngày, chỉ tính dòng có Người quét
       stt = homNay.filter(r => o(r, 'Người quét')).reduce((m, r) => Math.max(m, Number(o(r, 'STT')) || 0), 0) + 1;
-      dat('STT', stt);
-      dat('Ngày quét', hn);
-      dat('Trạng thái', 'Đơn đi');
+      Object.assign(dong, { 'STT': stt, 'Ngày quét': hn, 'Trạng thái': 'Đơn đi' });
     }
-    // ghi ngay sau dòng cuối có dữ liệu (như appendRow)
-    await this.g('/values/' + encodeURIComponent(q(tab) + '!A' + (all.length + 1)) + '?valueInputOption=USER_ENTERED',
-      { method: 'PUT', body: JSON.stringify({ values: [dong] }) });
-    const tG = Date.now() - t1 - tQ - tD;
+    this.cho.push({ id: dong.ID, loai: loai, ma: ma, o: dong });
+    await this.catCho();                                       // đã cất vào ổ Cloudflare -> mất kết nối Google vẫn không mất đơn
+    this.day();                                                // ghi Sheet ngầm, không chờ
     const kq = { ok: true, moi: true, ma: ma, stt: stt, gio: now.day.slice(11, 16), dem: homNay.length + 1, ai: v.t, nhanh: true,
-      t: 'quyền ' + (tQ / 1000).toFixed(1) + ' · đọc ' + (tD / 1000).toFixed(1) + ' · ghi ' + (tG / 1000).toFixed(1) };
+      t: (tD ? 'đọc Sheet ' + (tD / 1000).toFixed(1) + ' · ' : '') + 'lên Sheet sau vài giây' + (this.cho.length > 1 ? ' · ' + this.cho.length + ' đang chờ' : '') + (this.loiDay ? ' · lần ghi trước lỗi: ' + this.loiDay : '') };
     if (loai === 'HOAN') {             // đối chiếu đơn đi (mã hoàn có thể khác ký tự cuối)
-      const di = bg.valueRanges[1].values || [[]], hd = di[0] || [];
-      const cMa = hd.indexOf('Mã vận đơn'), cNgay = hd.indexOf('Ngày quét'), cTt = hd.indexOf('Trạng thái giao hàng');
-      for (let i = di.length - 1; i >= 1; i--) {
-        const m2 = String(di[i][cMa] || '').trim().toUpperCase();
+      const bd = this.kho.DI, di = this.dsDong('DI');
+      for (let i = di.length - 1; i >= 0; i--) {
+        const m2 = this.doc(bd, di[i], 'Mã vận đơn').trim().toUpperCase();
         if (m2 && (m2 === ma || (ma.length >= 16 && m2.slice(0, 16) === ma.slice(0, 16)))) {
-          kq.donDi = { ngay: cNgay >= 0 ? di[i][cNgay] || '' : '', tt: cTt >= 0 ? di[i][cTt] || '' : '' };
+          kq.donDi = { ngay: this.doc(bd, di[i], 'Ngày quét'), tt: this.doc(bd, di[i], 'Trạng thái giao hàng') };
           break;
         }
       }
     }
     kq.ms = Date.now() - t0;
     return kq;
+  }
+
+  // ----- nút Xóa trên trang: mã còn trong hàng chờ thì bỏ luôn ở đây; đã lên Sheet thì trang xoá tiếp qua Apps Script
+  async xoaDon(p) {
+    const v = await this.kiemVe(p.ve);
+    const loai = p.loai === 'HOAN' ? 'HOAN' : 'DI', ma = chuanMaDon(p.ma);
+    while (this.dayP) await this.dayP;                         // đang ghi dở thì đợi ghi xong, tránh xoá hụt
+    await this.napCho();
+    const n = this.cho.length;
+    this.cho = this.cho.filter(x => !(x.loai === loai && x.ma === ma && x.o['Người quét'] === v.t));
+    if (this.cho.length < n) { await this.catCho(); return { ok: true, xongHang: true }; }
+    if (this.kho) { const b = this.kho[loai]; b.rows = b.rows.filter(r => this.doc(b, r, 'Mã vận đơn').trim().toUpperCase() !== ma); }
+    return { ok: true, xongHang: false };
   }
 }
 
