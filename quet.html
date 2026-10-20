@@ -90,9 +90,9 @@ function goi(app,body){return fetch(EXEC+'?app='+app,{method:'POST',headers:{'Co
 function ghiDon(b){if(!(tt&&tt.nhanh&&tt.ve))return goi('qd',b);
   const ac=new AbortController(),hen=setTimeout(()=>ac.abort(),6000);
   return fetch(tt.nhanh,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(Object.assign({ve:tt.ve},b)),signal:ac.signal})
-    .then(r=>r.json()).then(r=>{clearTimeout(hen);return r.loiMay?duPhong(b):r;}).catch(()=>{clearTimeout(hen);return duPhong(b);});}
-function duPhong(b){return goi('qd',b).then(r=>{     // máy chủ nhanh có thể đã ghi rồi mới mất kết nối -> báo trùng chính mình thì coi như đã ghi
-  if(r.chan==='TRUNG'&&r.ai===tt.ten&&vuaQuet(r.luc))return{ok:true,moi:true,ma:r.ma,stt:r.stt,gio:String(r.luc).slice(11,16)};return r;});}
+    .then(r=>r.json()).then(r=>{clearTimeout(hen);return r.loiMay?duPhong(b,r.text):r;}).catch(e=>{clearTimeout(hen);return duPhong(b,e&&e.name==='AbortError'?'quá 6 giây':'lỗi mạng');});}
+function duPhong(b,ly){return goi('qd',b).then(r=>{r.duPhong=ly||'';     // máy chủ nhanh có thể đã ghi rồi mới mất kết nối -> báo trùng chính mình thì coi như đã ghi
+  if(r.chan==='TRUNG'&&r.ai===tt.ten&&vuaQuet(r.luc))return{ok:true,moi:true,ma:r.ma,stt:r.stt,gio:String(r.luc).slice(11,16),duPhong:r.duPhong};return r;});}
 function vuaQuet(luc){const m=String(luc||'').match(/^(\d\d)\/(\d\d)\/(\d{4}) (\d\d):(\d\d)/);if(!m)return false;
   const t=Date.UTC(+m[3],m[2]-1,+m[1],+m[4]-7,+m[5]);return Math.abs(Date.now()-t)<5*60000;}
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
@@ -104,7 +104,7 @@ function tieng(kieu){try{if(!ac)ac=new (window.AudioContext||window.webkitAudioC
     g.gain.setValueAtTime(0.25,t+d);g.gain.exponentialRampToValueAtTime(0.001,t+d+0.15);o.connect(g);g.connect(ac.destination);o.start(t+d);o.stop(t+d+0.16);});}catch(e){}
   try{Telegram.WebApp.HapticFeedback.notificationOccurred(kieu==='ok'?'success':'error');}catch(e){try{navigator.vibrate&&navigator.vibrate(kieu==='ok'?60:[200,100,200]);}catch(e2){}}}
 let tb=null;
-function bao(t){const b=$('bao');b.textContent=t;b.style.display='block';clearTimeout(tb);tb=setTimeout(()=>b.style.display='none',1500);}
+function bao(t){const b=$('bao');b.textContent=t;b.style.display='block';clearTimeout(tb);tb=setTimeout(()=>b.style.display='none',t.indexOf('Đã lưu')>=0?4000:1500);}
 // ---------- popup chặn: dừng camera đọc mã đến khi bấm OK
 function popup(kieu,ma,nd){const P={TRUNG:['🟠','ĐƠN TRÙNG – ĐÃ QUÉT RỒI'],FUN:['🟣','MÃ FUN – CHƯA ĐẨY SANG ĐƠN VỊ VẬN CHUYỂN'],HUY:['🔴','ĐƠN ĐÃ HỦY – KHÔNG GIAO']}[kieu];
   popMo=true;$('pop').className='pop '+kieu;$('pop').style.display='flex';$('pIc').textContent=P[0];$('pTd').textContent=P[1];$('pMa').textContent=ma;$('pNd').textContent=nd||'';
@@ -125,7 +125,7 @@ function capSo(){['DI','HOAN'].forEach(k=>$('n'+k).textContent=demHomNay(k));$('
   try{cho?Telegram.WebApp.enableClosingConfirmation():Telegram.WebApp.disableClosingConfirmation();}catch(e){}}
 // ---------- danh sách
 function ve(){const el=$('ds');el.innerHTML='';ds[loai].filter(x=>x.tt!=='xoa').forEach(x=>{const d=document.createElement('div');d.className='it';
-  const chip={moi:'',cho:'<span class="chip cho">⏳ Đang gửi</span>',loi:'<span class="chip loi">❌ Chưa ghi</span>'}[x.tt]||'';
+  const chip={moi:x.tg?'<span class="chip" style="white-space:normal;background:#ffffff14">'+esc(x.tg)+'</span>':'',cho:'<span class="chip cho">⏳ Đang gửi</span>',loi:'<span class="chip loi">❌ Chưa ghi</span>'}[x.tt]||'';
   let h='<div class="r"><span>'+(x.stt?'<span class="stt">'+esc(x.stt)+'</span>':'')+'<span class="ma">'+esc(x.ma)+'</span></span>'+chip+'</div>'+
     '<div class="m">'+esc(x.gio||'')+(x.ai?' · '+esc(x.ai):'')+(x.donDi?' · khớp đơn đi '+esc(x.donDi.ngay)+(x.donDi.tt?' ('+esc(x.donDi.tt)+')':''):'')+
     (x.lyDo?' · <span class="loi">'+esc(x.lyDo)+'</span>':'')+(x.loi?' · <span class="loi">'+esc(x.loi)+'</span>':'')+'</div>';
@@ -159,7 +159,8 @@ function gui(x,lan){x.tt='cho';x.loi='';ve();lan=lan||0;const t0=Date.now();
   ghiDon({loai:x.loai,ma:x.ma}).then(r=>{
     if(!r.ok){x.tt='loi';x.loi=r.text;tieng('loi');ve();return;}
     if(r.chan){x.tt='xoa';ve();popup(r.chan,x.ma,r.chan==='FUN'?ND.FUN:r.chan==='HUY'?ND.HUY(r):ND.TRUNG(r));return;}
-    x.tt='moi';x.stt=r.stt;x.gio=r.gio||x.gio;x.donDi=r.donDi;ve();bao((r.nhanh?'⚡ ':'✓ ')+'Đã lưu '+x.ma+' · '+((Date.now()-t0)/1000).toFixed(1)+' giây');
+    x.tt='moi';x.stt=r.stt;x.gio=r.gio||x.gio;x.donDi=r.donDi;ve();const giay=((Date.now()-t0)/1000).toFixed(1);x.tg=(r.nhanh?'⚡ ':'🐢 ')+giay+'s'+(r.ms?' · máy chủ '+(r.ms/1000).toFixed(1)+'s':'')+(r.t?' ('+r.t+')':'')+(r.duPhong?' · dự phòng: '+r.duPhong:'');ve();
+    bao((r.nhanh?'⚡ ':'✓ ')+'Đã lưu '+x.ma+' · '+giay+' giây');
   }).catch(()=>{x.tt='loi';x.loi='Mất mạng – tự gửi lại';ve();if(lan<20)setTimeout(()=>gui(x,lan+1),4000);});}
 // ---------- camera & đọc mã
 function chup(){const v=$('vid');if(!luong||!v.videoWidth)return null;const M=1280,s=Math.min(1,M/Math.max(v.videoWidth,v.videoHeight));

@@ -18,7 +18,7 @@ export default {
 };
 
 export class KhoaQuet {
-  constructor(state, env) { this.env = env; this.tok = null; this.hetTok = 0; this.hang = Promise.resolve(); }
+  constructor(state, env) { this.state = state; this.env = env; this.tok = null; this.hetTok = 0; this.hang = Promise.resolve(); }
   async fetch(req) {
     let p;
     try { p = await req.json(); } catch (e) { return json({ ok: false, text: 'Dữ liệu gửi lên không đọc được.' }); }
@@ -42,6 +42,8 @@ export class KhoaQuet {
   // ----- Google
   async token() {
     if (this.tok && Date.now() < this.hetTok) return this.tok;
+    const luu = await this.state.storage.get('tok');           // giữ quyền Google qua các lần Cloudflare tắt/bật lại đối tượng
+    if (luu && Date.now() < luu.het) { this.tok = luu.tok; this.hetTok = luu.het; return this.tok; }
     const sa = JSON.parse(this.env.GOOGLE_SA);
     const now = Math.floor(Date.now() / 1000);
     const enc = o => b64url(new TextEncoder().encode(JSON.stringify(o))).replace(/=+$/, '');
@@ -55,6 +57,7 @@ export class KhoaQuet {
     const j = await r.json();
     if (!j.access_token) throw new Error('Không lấy được quyền Google: ' + (j.error_description || j.error || r.status));
     this.tok = j.access_token; this.hetTok = Date.now() + 50 * 60 * 1000;
+    await this.state.storage.put('tok', { tok: this.tok, het: this.hetTok });
     return this.tok;
   }
   async g(path, opt) {
@@ -76,10 +79,12 @@ export class KhoaQuet {
     if (loai === 'DI' && /^FUN/i.test(ma)) return { ok: true, chan: 'FUN', ma: ma };
 
     const tab = QDON[loai].tab;
+    const t1 = Date.now(); await this.token(); const tQ = Date.now() - t1;
     const ranges = [q(tab) + '!A1:AZ'];
     if (loai === 'DI') ranges.push('DON_HUY!A2:E');
     else ranges.push(q(QDON.DI.tab) + '!A1:AZ');
     const bg = await this.g('/values:batchGet?valueRenderOption=FORMATTED_VALUE&' + ranges.map(r => 'ranges=' + encodeURIComponent(r)).join('&'));
+    const tD = Date.now() - t1 - tQ;
     const all = bg.valueRanges[0].values || [[]];
     let h = all[0] || [];
     const rows = all.slice(1);
@@ -121,7 +126,9 @@ export class KhoaQuet {
     // ghi ngay sau dòng cuối có dữ liệu (như appendRow)
     await this.g('/values/' + encodeURIComponent(q(tab) + '!A' + (all.length + 1)) + '?valueInputOption=USER_ENTERED',
       { method: 'PUT', body: JSON.stringify({ values: [dong] }) });
-    const kq = { ok: true, moi: true, ma: ma, stt: stt, gio: now.day.slice(11, 16), dem: homNay.length + 1, ai: v.t, nhanh: true };
+    const tG = Date.now() - t1 - tQ - tD;
+    const kq = { ok: true, moi: true, ma: ma, stt: stt, gio: now.day.slice(11, 16), dem: homNay.length + 1, ai: v.t, nhanh: true,
+      t: 'quyền ' + (tQ / 1000).toFixed(1) + ' · đọc ' + (tD / 1000).toFixed(1) + ' · ghi ' + (tG / 1000).toFixed(1) };
     if (loai === 'HOAN') {             // đối chiếu đơn đi (mã hoàn có thể khác ký tự cuối)
       const di = bg.valueRanges[1].values || [[]], hd = di[0] || [];
       const cMa = hd.indexOf('Mã vận đơn'), cNgay = hd.indexOf('Ngày quét'), cTt = hd.indexOf('Trạng thái giao hàng');
