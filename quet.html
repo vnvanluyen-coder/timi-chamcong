@@ -48,7 +48,7 @@ html,body{margin:0;background:var(--n);color:var(--t);font:15px/1.4 -apple-syste
 /* popup chặn */
 .pop{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;padding:18px;background:#000000b3}
 .pop .hop{width:100%;max-width:420px;border-radius:18px;padding:20px 18px 16px;color:#fff;text-align:center;box-shadow:0 10px 40px #0009}
-.pop.TRUNG .hop{background:#8a4d00}.pop.FUN .hop{background:#5b2a8c}.pop.HUY .hop{background:#9b1c1c}
+.pop.TRUNG .hop{background:#8a4d00}.pop.LA .hop{background:#8a6d00}.pop #pLuu{background:#ffd54a}.pop.FUN .hop{background:#5b2a8c}.pop.HUY .hop{background:#9b1c1c}
 .pop .ic{font-size:46px;line-height:1}
 .pop h2{margin:8px 0 6px;font-size:21px}
 .pop .ma{font:700 19px ui-monospace,Menlo,Consolas,monospace;word-break:break-all;background:#00000040;border-radius:10px;padding:8px;margin:8px 0}
@@ -71,7 +71,7 @@ html,body{margin:0;background:var(--n);color:var(--t);font:15px/1.4 -apple-syste
   <div id="ban">Trang quét v3</div>
 </div>
 <div class="pop" id="pop"><div class="hop"><div class="ic" id="pIc"></div><h2 id="pTd"></h2><div class="ma" id="pMa"></div><p id="pNd"></p>
-  <button id="pOk">OK – quét tiếp</button></div></div>
+  <button id="pLuu" style="display:none">Lưu mã này</button><button id="pOk">OK – quét tiếp</button></div></div>
 <script>
 const EXEC='https://script.google.com/macros/s/AKfycbzBTUAQ1A3MIz8BlhbKHYIsQbPKV9rxjbHgOGoLSZwiaQa8KjIu756s_oZzVWt-pGc/exec';
 const $=i=>document.getElementById(i);
@@ -112,13 +112,16 @@ function tieng(kieu){try{if(!ac)ac=new (window.AudioContext||window.webkitAudioC
 let tb=null;
 function bao(t){const b=$('bao');b.textContent=t;b.style.display='block';clearTimeout(tb);tb=setTimeout(()=>b.style.display='none',t.indexOf('Đã lưu')>=0?4000:1500);}
 // ---------- popup chặn: dừng camera đọc mã đến khi bấm OK
-function popup(kieu,ma,nd){const P={TRUNG:['🟠','ĐƠN TRÙNG – ĐÃ QUÉT RỒI'],FUN:['🟣','MÃ FUN – CHƯA ĐẨY SANG ĐƠN VỊ VẬN CHUYỂN'],HUY:['🔴','ĐƠN ĐÃ HỦY – KHÔNG GIAO']}[kieu];
+function popup(kieu,ma,nd){const P={LA:['🟡','MÃ LẠ – KHÔNG PHẢI MÃ VẬN ĐƠN SPX'],TRUNG:['🟠','ĐƠN TRÙNG – ĐÃ QUÉT RỒI'],FUN:['🟣','MÃ FUN – CHƯA ĐẨY SANG ĐƠN VỊ VẬN CHUYỂN'],HUY:['🔴','ĐƠN ĐÃ HỦY – KHÔNG GIAO']}[kieu];
   popMo=true;$('pop').className='pop '+kieu;$('pop').style.display='flex';$('pIc').textContent=P[0];$('pTd').textContent=P[1];$('pMa').textContent=ma;$('pNd').textContent=nd||'';
+  $('pLuu').style.display=kieu==='LA'?'block':'none';$('pOk').textContent=kieu==='LA'?'Bỏ qua – quét tiếp':'OK – quét tiếp';
   try{$('vid').pause();}catch(e){}tieng(kieu);}
 function capNhatPop(ma,nd){if(popMo&&$('pMa').textContent===ma)$('pNd').textContent=nd;}
-$('pOk').onclick=()=>{popMo=false;$('pop').style.display='none';try{$('vid').play();}catch(e){}
-  ganDay.set(loai+$('pMa').textContent,Date.now()+5000);};   // tem vẫn trước camera: bỏ qua mã này thêm vài giây
-const ND={FUN:'Đơn này chưa có mã vận đơn của SPX – shipper sẽ không nhận.\nĐể gói này RIÊNG RA, in lại phiếu từ Sapo rồi quét phiếu mới.',
+function dongPop(){popMo=false;$('pop').style.display='none';try{$('vid').play();}catch(e){}
+  ganDay.set(loai+$('pMa').textContent,Date.now()+5000);}   // tem vẫn trước camera: bỏ qua mã này thêm vài giây
+$('pOk').onclick=dongPop;
+$('pLuu').onclick=()=>{const ma=$('pMa').textContent;dongPop();if(daCo[loai].has(ma)){popup('TRUNG',ma,ND.TRUNG(null));return;}luuMoi(loai,ma);};
+const ND={LA:'Mã này không đúng dạng SPXVN… – có thể là mã khác dán trên gói, hoặc tem bị che/nhăn nên đọc sai.\nĐơn thật thì bấm "Lưu mã này". Không phải thì bấm Bỏ qua.',FUN:'Đơn này chưa có mã vận đơn của SPX – shipper sẽ không nhận.\nĐể gói này RIÊNG RA, in lại phiếu từ Sapo rồi quét phiếu mới.',
   HUY:r=>'Đơn '+(r.maDon||'')+' · '+(r.loaiHuy||r.loai||'Đã hủy')+(r.luc?' lúc '+r.luc:'')+(r.khach?'\nKhách: '+r.khach:'')+'\nRút gói này ra, KHÔNG giao cho shipper.',
   TRUNG:r=>r&&r.luc?('Đã quét lúc '+r.luc+(r.ai?' · '+r.ai:'')+(r.stt?' · STT '+r.stt:'')+(r.tt?'\nTrạng thái: '+r.tt:'')+'\nKiểm tra xem có bị in/đóng 2 lần không.'):'Mã này đã có trong danh sách. Đang lấy chi tiết…'};
 // ---------- chế độ, đếm
@@ -155,15 +158,35 @@ function hanhDong(x,a,v){
 }
 // ---------- quét được mã
 function gioNay(){return new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'});}
-function chuan(s){s=String(s||'').trim().toUpperCase();const m=s.match(/SPXVN[0-9A-Z]{8,14}/)||s.match(/FUN\d{3,12}/);return m?m[0]:s.replace(/\s+/g,'').slice(0,60);}
-function nhan(raw){if(popMo)return;const ma=chuan(raw);if(ma.length<6)return;
-  if(!tt){if(choTai.indexOf(loai+'|'+ma)<0){choTai.push(loai+'|'+ma);tieng('ok');bao('✓ '+ma+' · chờ tải xong sẽ ghi');}return;}
-  const l=loai,now=Date.now();
-  if(ganDay.has(l+ma)&&now-ganDay.get(l+ma)<3000)return;ganDay.set(l+ma,now);
+function chuan(s){s=String(s||'').trim().toUpperCase();const m=s.match(/SPXVN\d{11}[0-9A-Z](?![0-9A-Z])/)||s.match(/SPXVN[0-9A-Z]{8,14}/)||s.match(/FUN\d{3,12}/);return m?m[0]:s.replace(/\s+/g,'').slice(0,60);}
+// mã vận đơn SPX: SPXVN + 11 số + 1 ký tự (A hoặc số) – đọc ra khác dạng này là tem bị che/nhăn, đọc sai
+function laSpx(ma){return /^SPXVN\d{11}[0-9A-Z]$/.test(ma);}
+function laFun(ma){return /^FUN\d{3,12}$/.test(ma);}
+// mã gần giống SPX (đọc méo) hoặc QR đường link (QR fanpage dán trên gói): camera bỏ qua, chờ đọc lại cho đúng
+function laMeo(raw,ma){const s=String(raw||'').toUpperCase().replace(/\s+/g,'');
+  return /^HTTPS?:/.test(s)||/SPX|PXV|XVN|SP.VN|SPX.N/.test(s)||/^SP/.test(ma)||(ma.length>=15&&ma.length<=19&&(ma.match(/\d/g)||[]).length>=10);}
+let laCho=null,vuaLuu=null;   // laCho: mã lạ đọc lần 1 · vuaLuu: đơn vừa lưu trên máy này
+function nhan(raw,tay){if(popMo)return;const ma=chuan(raw);if(ma.length<6)return;
+  const l=loai,now=Date.now(),chuanMa=laSpx(ma)||laFun(ma);
+  if(!chuanMa&&!tay){
+    if(laMeo(raw,ma))return;
+    if(!(laCho&&laCho.ma===ma&&now-laCho.t<1500)){laCho={ma,t:now};return;}   // mã lạ: phải đọc ra giống nhau 2 lần liền
+  }
+  // tem còn trong khung hình thì không tính lại: mỗi lần còn thấy mã thì gia hạn thêm 3 giây
+  if(ganDay.has(l+ma)&&now-ganDay.get(l+ma)<3000){ganDay.set(l+ma,Math.max(ganDay.get(l+ma),now));return;}ganDay.set(l+ma,now);
+  laCho=null;
+  if(!tt){if(!chuanMa){bao('Đang tải – quét lại mã này sau');return;}
+    if(choTai.indexOf(l+'|'+ma)<0){choTai.push(l+'|'+ma);tieng('ok');bao('✓ '+ma+' · chờ tải xong sẽ ghi');}return;}
+  // quét lại đúng đơn vừa lưu (chưa quét đơn khác, dưới 10 giây): chỉ nhắc nhẹ, không báo trùng
+  if(vuaLuu&&vuaLuu.l===l&&vuaLuu.ma===ma&&now-vuaLuu.t<10000&&daCo[l].has(ma)){bao('✓ '+ma+' · vừa lưu lúc '+vuaLuu.gio+' rồi');return;}
+  vuaLuu=null;
+  if(!chuanMa){popup('LA',ma,ND.LA);return;}
   if(l==='DI'&&/^FUN/.test(ma)){popup('FUN',ma,ND.FUN);return;}
   if(daCo[l].has(ma)){popup('TRUNG',ma,ND.TRUNG(null));ghiDon({loai:l,ma}).then(r=>{if(r.chan==='TRUNG')capNhatPop(ma,ND.TRUNG(r));}).catch(()=>{});return;}
   if(l==='DI'&&huy[ma]){popup('HUY',ma,ND.HUY(Object.assign({loaiHuy:huy[ma].loai},huy[ma])));return;}
-  daCo[l].add(ma);const x={ma,loai:l,tt:'cho',gio:gioNay(),anhs:[],cuaToi:true,ai:tt.ten};ds[l].unshift(x);themCho(x);tieng('ok');bao('✓ '+ma+' · đã nhận');ve();gui(x);}
+  luuMoi(l,ma);}
+function luuMoi(l,ma){const g=gioNay();vuaLuu={l,ma,t:Date.now(),gio:g};
+  daCo[l].add(ma);const x={ma,loai:l,tt:'cho',gio:g,anhs:[],cuaToi:true,ai:tt.ten};ds[l].unshift(x);themCho(x);tieng('ok');bao('✓ '+ma+' · đã nhận');ve();gui(x);}
 function gui(x,lan){x.tt='cho';x.loi='';ve();lan=lan||0;const t0=Date.now();
   ghiDon({loai:x.loai,ma:x.ma}).then(r=>{
     if(!r.ok){x.tt='loi';x.loi=r.text;tieng('loi');ve();return;}
@@ -187,14 +210,14 @@ async function moCam(tuDong){
   const v=$('vid');v.srcObject=luong;try{await v.play();}catch(e){}
   $('batdau').style.display='none';
   try{if(ac)ac.resume();else ac=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}
-  try{if('BarcodeDetector' in window){const f=await BarcodeDetector.getSupportedFormats();const can=['code_128','qr_code','code_39','ean_13','data_matrix'].filter(x=>f.indexOf(x)>=0);
+  try{if('BarcodeDetector' in window){const f=await BarcodeDetector.getSupportedFormats();const can=['code_128','qr_code'].filter(x=>f.indexOf(x)>=0);
     if(can.indexOf('code_128')>=0&&can.indexOf('qr_code')>=0)det=new BarcodeDetector({formats:can});}}catch(e){det=null;}
   taoZx();hienBan();
   const tr=luong.getVideoTracks()[0];let cap={};try{cap=tr.getCapabilities?tr.getCapabilities():{};}catch(e){}if(!cap.torch)$('nDen').disabled=true;
   dang=true;vong();}
-function taoZx(){if(det||zx||!window.ZXing)return;const H=new Map();H.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[ZXing.BarcodeFormat.CODE_128,ZXing.BarcodeFormat.QR_CODE,ZXing.BarcodeFormat.CODE_39,ZXing.BarcodeFormat.EAN_13]);
+function taoZx(){if(det||zx||!window.ZXing)return;const H=new Map();H.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[ZXing.BarcodeFormat.CODE_128,ZXing.BarcodeFormat.QR_CODE]);
   H.set(ZXing.DecodeHintType.TRY_HARDER,true);zx=new ZXing.MultiFormatReader();zx.setHints(H);hienBan();}
-function hienBan(){$('ban').textContent='Trang quét v6 · đọc mã: '+(det?'máy':zx?'zxing':'đang tải…')+' · '+((window.Telegram&&Telegram.WebApp.platform)||'?');}
+function hienBan(){$('ban').textContent='Trang quét v7 · đọc mã: '+(det?'máy':zx?'zxing':'đang tải…')+' · '+((window.Telegram&&Telegram.WebApp.platform)||'?');}
 $('nutBd').onclick=()=>batCam(false);
 function tatQuet(){hong=true;dang=false;choTai.length=0;$('nutBd').disabled=true;if(luong){luong.getTracks().forEach(t=>t.stop());luong=null;}$('batdau').style.display='grid';}
 const cv=document.createElement('canvas');
@@ -209,7 +232,7 @@ async function vong(){if(!dang)return;if(!dungTam&&!popMo){try{const t=await doc
 $('nDung').onclick=()=>{dungTam=!dungTam;$('nDung').textContent=dungTam?'▶️ Quét tiếp':'⏸ Tạm dừng';$('nDung').classList.toggle('bat',dungTam);};
 $('nDen').onclick=async()=>{if(!luong)return;den=!den;try{await luong.getVideoTracks()[0].applyConstraints({advanced:[{torch:den}]});$('nDen').classList.toggle('bat',den);}catch(e){den=false;}};
 $('nTay').onclick=()=>{const t=$('tay');t.style.display=t.style.display==='flex'?'none':'flex';if(t.style.display==='flex')$('oTay').focus();};
-$('guiTay').onclick=()=>{const v=$('oTay').value;if(v.trim()){ganDay.clear();nhan(v);$('oTay').value='';}};
+$('guiTay').onclick=()=>{const v=$('oTay').value;if(v.trim()){ganDay.clear();vuaLuu=null;nhan(v,true);$('oTay').value='';}};
 $('oTay').onkeydown=e=>{if(e.key==='Enter')$('guiTay').click();};
 // ---------- mở trang: lấy đơn hôm nay + danh sách đã có + đơn hủy
 // vé máy chủ nhanh giữ trên điện thoại: lần mở sau lấy danh sách từ Cloudflare (nhanh), Google chỉ chạy ngầm để cấp vé mới
@@ -237,7 +260,7 @@ function batDau(r){if(!r.ok){$('tt').innerHTML='<span class="loi">'+esc(r.loi)+'
     daCo[c.loai].add(c.ma);const x={ma:c.ma,loai:c.loai,tt:'cho',gio:c.gio,anhs:[],cuaToi:true,ai:r.ten,tuHang:true};ds[c.loai].unshift(x);gui(x);});
   setInterval(lamMoi,60000);
   if(r.quyen.indexOf(loai)<0)loai=r.quyen.indexOf('DI')>=0?'DI':'HOAN';chonLoai(loai);
-  choTai.splice(0).forEach(k=>{const i=k.indexOf('|'),l=k.slice(0,i),m=k.slice(i+1);if(r.quyen.indexOf(l)<0)return;const cu=loai;loai=l;ganDay.clear();nhan(m);loai=cu;});ve();
+  choTai.splice(0).forEach(k=>{const i=k.indexOf('|'),l=k.slice(0,i),m=k.slice(i+1);if(r.quyen.indexOf(l)<0)return;const cu=loai;loai=l;ganDay.clear();nhan(m,true);loai=cu;});ve();
 }
 moTrang();
 // mỗi phút lấy lại danh sách đã quét (của cả người khác) + đơn hủy, để đối chiếu trên điện thoại luôn mới
