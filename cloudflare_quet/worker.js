@@ -114,14 +114,29 @@ export class KhoaQuet {
         b.h = b.h.concat(thieu);
       }
       const dong = ghi.map(x => b.h.map(ten => x.o[ten] == null ? '' : x.o[ten]));
-      await this.g('/values/' + encodeURIComponent(q(tab) + '!A' + (b.soDong + 1)) + '?valueInputOption=USER_ENTERED',
+      const ghiDong = () => this.g('/values/' + encodeURIComponent(q(tab) + '!A' + (b.soDong + 1)) + '?valueInputOption=USER_ENTERED',
         { method: 'PUT', body: JSON.stringify({ values: dong }) });
+      try { await ghiDong(); }
+      catch (e) {                  // Sheet hết dòng trống (appendRow của Apps Script tự thêm, ghi thẳng thì không) -> thêm 500 dòng rồi ghi lại
+        if (!/exceeds grid limits/i.test(String(e.message))) throw e;
+        await this.themDong(tab, b.soDong + dong.length + 500);
+        await ghiDong();
+      }
       b.rows = b.rows.concat(dong); b.soDong += dong.length;
     }
     const xong = new Set(lo.map(x => x.id));
     this.cho = this.cho.filter(x => !xong.has(x.id));
     await this.catCho();
     this.kho = moi; this.loiDay = '';
+  }
+
+  async themDong(tab, can) {
+    const j = await this.g('?fields=sheets.properties(sheetId,title,gridProperties.rowCount)');
+    const pr = (j.sheets || []).map(x => x.properties).find(x => x.title === tab);
+    if (!pr) throw new Error('Không thấy tab ' + tab);
+    const co = pr.gridProperties.rowCount;
+    if (co >= can) return;
+    await this.g(':batchUpdate', { method: 'POST', body: JSON.stringify({ requests: [{ appendDimension: { sheetId: pr.sheetId, dimension: 'ROWS', length: can - co } }] }) });
   }
 
   // ----- quét 1 mã: giống quetDon trong ChamCong.js
